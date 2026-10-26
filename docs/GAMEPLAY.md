@@ -103,8 +103,9 @@ turned aside, which rewards moving round them.
   `retarget.ts`, `skins.ts`, `stash.ts`, `ual.ts`, `highwall.ts` and `actor.ts` over this repo's (see the README). So new
   logic goes in new modules and in `game.ts`, and those ten files stay untouched. If a change to one of them is
   unavoidable it is made in both places.
-- **New work only.** The co-op changes and the bunker/exit lighting were made on Oct 26, before the building period; they
-  are committed on Oct 27 so history shows them inside the window. Everything in this track is built from Oct 27.
+- **New work only.** The co-op changes and the bunker/exit lighting were made on Oct 26, before the building period. They
+  are committed on Oct 26, under their real date, and tagged `pre-hackathon-final`, so they count as carried-over work and
+  are disclosed as such. Everything in this track is built from Oct 27, nothing earlier.
 - **Co-op:** every new enemy and structure is tested with the AI partner on.
 - **Tests:** pure rules (radio, habits, sniper aim, platform reachability) get unit tests; the levels get a headless
   play-through with and without the partner.

@@ -181,7 +181,8 @@ Playtest feedback (levels feel alike, run and gun, enemies too easy) is answered
 radio check-ins, counters to the player's habits, snipers in the tower, and a taller bunker with sniper platforms,
 bridges and turrets. Details, the chosen heights and the schedule are in [`GAMEPLAY.md`](GAMEPLAY.md). It never
 displaces a Must item. The co-op work (the AI partner on the tower, bunker and exit) and the bunker and exit lighting
-were done on Oct 26, before the building period, and are committed on Oct 27 so history shows them inside the window.
+were done on Oct 26, before the building period. They are committed under their real date and tagged
+`pre-hackathon-final`: they are carried-over work, disclosed as such, and everything after that tag is hackathon work.
 
 ## 12. Open questions
 
