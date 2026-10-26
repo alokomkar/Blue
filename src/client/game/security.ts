@@ -5,7 +5,9 @@
 //
 // Relies on generateMaze() producing a perfect maze (a spanning tree): every
 // open passage is the only route between its two sides, so a door on one
-// passage seals off exactly the subtree beyond it — its "section". Rooms are
+// passage seals off exactly the subtree beyond it — its "section". (A floor that
+// has loops, a sketch's rings and open rooms, gets doors only on passages that are
+// bridges, the ones that really are the only route; see isBridge.) Rooms are
 // dead-end pockets off corridors (1 cell, or 2 when the pocket runs straight
 // for two cells), which keeps rooms genuinely isolated without changing
 // maze generation at all.
@@ -121,6 +123,23 @@ function openNeighbors(cells: MazeCells, cols: number, rows: number, x: number, 
   return out;
 }
 
+/** Whether closing the passage from p to c cuts c off from `spawn`: it does on every passage of a tree, and only on some when the floor has loops. */
+function isBridge(cells: MazeCells, cols: number, rows: number, spawn: { x: number; y: number }, p: { x: number; y: number }, c: { x: number; y: number }): boolean {
+  const seen = new Set<string>([key(spawn.x, spawn.y)]);
+  const queue = [spawn];
+  for (let qi = 0; qi < queue.length; qi++) {
+    const cur = queue[qi]!;
+    for (const n of openNeighbors(cells, cols, rows, cur.x, cur.y)) {
+      const shut = (cur.x === p.x && cur.y === p.y && n.x === c.x && n.y === c.y) || (cur.x === c.x && cur.y === c.y && n.x === p.x && n.y === p.y);
+      if (shut || seen.has(key(n.x, n.y))) continue;
+      if (n.x === c.x && n.y === c.y) return false;
+      seen.add(key(n.x, n.y));
+      queue.push({ x: n.x, y: n.y });
+    }
+  }
+  return true;
+}
+
 function shuffle<T>(arr: T[]): T[] {
   for (let i = arr.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -196,6 +215,7 @@ export function planSecurity(
     if (used.has(key(c.x, c.y)) || used.has(key(p.x, p.y))) continue;
     const nbrs = openNeighbors(cells, cols, rows, c.x, c.y);
     if (nbrs.length !== 2 || OPPOSITE[nbrs[0]!.dir] !== nbrs[1]!.dir) continue;
+    if (!isBridge(cells, cols, rows, spawn, p, c)) continue; // (a loop's passage: a door there would be walked round)
     const frac = size[c.y]![c.x]! / total;
     if (frac < SECTION_MIN_FRACTION || frac > Math.min(SECTION_MAX_FRACTION, 0.9 / Math.max(1, doorCount))) continue;
     if (!hasFreeDeadEnd(c)) continue;

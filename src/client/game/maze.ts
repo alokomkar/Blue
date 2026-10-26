@@ -339,6 +339,15 @@ export function placeStair(cols: number, rows: number, cells: MazeCells, dist: n
       const ry = Math.floor(Math.random() * rows);
       found = fits(rx, ry);
     }
+    // 300 random cells can miss the one cell that fits (a sketch may have a single spur, and a big floor has few cells to hit it with): look at every cell before giving up.
+    if (!found) {
+      const all: Array<{ x: number; y: number; spanX: boolean }> = [];
+      for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) {
+        const f = fits(x, y);
+        if (f) all.push(f);
+      }
+      if (all.length) found = all[Math.floor(Math.random() * all.length)]!;
+    }
   } else {
     const all: Array<{ x: number; y: number; spanX: boolean }> = [];
     for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) {

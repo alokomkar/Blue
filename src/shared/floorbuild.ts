@@ -11,7 +11,7 @@
 // sentries and heavies (they stand at a room's door), and the decorative rooms' look. They take cells from `used` in the game, so a floor built here can differ from the
 // game's in where the last few small things sit (never in the plan, the exit, the stair or the doors, which are placed first).
 
-import { effectiveSize, inspectSpec, twistedRoster, type ContractId, type LayoutId, type LevelSpec, type PlaceId, type Pt } from './levelspec.ts';
+import { BUILD_PHASE, carveAlcoves, effectiveSize, enemyPhase, hazardPhase, inspectSpec, phaseSeed, twistedRoster, type ContractId, type LayoutId, type LevelSpec, type PlaceId, type Pt } from './levelspec.ts';
 import { checkFloors, checkSpec, type Cell, type Dir, type EnemyKind, type Expect, type Failure, type HazardKind, type Station, type VerifyFloor, type VerifyOptions, type VerifyResult } from './verify.ts';
 
 type Spot = Pt & { spanX: boolean };
@@ -38,7 +38,7 @@ export type FloorGenerators = {
     dist: number[][],
     spawn: Pt,
     used: Set<string>,
-    counts: { doors: number; storage: number; decor: number; chain?: boolean; network?: ReadonlyArray<'uplink' | 'logs'> }
+    counts: { doors: number; storage: number; decor: number; chain?: boolean; network?: ReadonlyArray<'uplink' | 'logs'>; entry?: ((open: (x: number, y: number) => boolean, taken: ReadonlySet<string>) => Pt | null) | undefined }
   ): { doors: Array<Pt & { id: number; dir: Dir }>; rooms: Array<Pt & { kind: string; keyId: number | null }> };
   placeBotSpawn(cols: number, rows: number, dist: number[][], used: Set<string>): Pt | null;
   placeHidingSpots(cols: number, rows: number, dist: number[][], used: Set<string>, count: number): Pt[];
@@ -48,6 +48,9 @@ export type FloorGenerators = {
   placeLines(cells: Cell[][], cols: number, rows: number, dist: number[][], used: Set<string>, count: number, size?: 1 | 2 | 3): Pt[];
   placeGates(cells: Cell[][], cols: number, rows: number, dist: number[][], used: Set<string>, count: number): Pt[];
   placeShutters(cells: Cell[][], cols: number, rows: number, dist: number[][], used: Set<string>, count: number): Pt[];
+  /** entries.ts's roofHatch and tunnelGrate: where the way in goes (the roof hatch upstairs, the service tunnel's grate on the ground floor), a dead end that takes a room's place. Left out, it is not reserved. */
+  roofHatch?(cells: Cell[][], cols: number, rows: number, dist: number[][], taken: ReadonlySet<string>, open?: (x: number, y: number) => boolean): Pt | null;
+  tunnelGrate?(cells: Cell[][], cols: number, rows: number, dist: number[][], taken: ReadonlySet<string>, exitDist: number, open?: (x: number, y: number) => boolean): Pt | null;
   /** objectives.ts's planObjectives: a contract's steps, each in the big room or along a wall, on a floor. */
   planObjectives(contract: ContractId, floors: 1 | 2, pick: number): { steps: Array<{ where: 'landmark' | 'wall'; floor: 0 | 1 }> };
 };
@@ -71,22 +74,32 @@ function gridCells(grid: NonNullable<LevelSpec['grid']>): Cell[][] {
 type Counts = { documents: number; network: ReadonlyArray<'uplink' | 'logs'>; objectiveHere: boolean };
 
 /** One floor's doors, rooms, enemies and hazards, placed as populateFloor places them. */
-function populate(spec: LevelSpec, g: FloorGenerators, floor: 0 | 1, plan: Plan, dist: number[][], used: Set<string>, start: Pt, counts: Counts): Omit<VerifyFloor, 'exit' | 'stair' | 'expect'> {
+function populate(spec: LevelSpec, g: FloorGenerators, floor: 0 | 1, plan: Plan, dist: number[][], used: Set<string>, start: Pt, counts: Counts, exitDist = 0): Omit<VerifyFloor, 'exit' | 'stair' | 'expect'> {
   const { cells } = plan;
   const rows = cells.length;
   const cols = cells[0]?.length ?? 0;
   const roster = twistedRoster(spec);
-  const sec = g.planSecurity(cells, cols, rows, dist, { x: 0, y: 0 }, used, {
+  g.seedRandom(phaseSeed(spec.seed, floor === 1 ? BUILD_PHASE.upperSecurity : BUILD_PHASE.groundSecurity)); // (the game reseeds here too: see phaseSeed)
+  const sec = g.planSecurity(cells, cols, rows, dist, start, used, {
     doors: spec.hazards.doors,
     storage: counts.documents,
     decor: DECOR_ROOMS,
     // A chain only with two doors to chain; the harder jobs chain them, and a chain asks more of the plan than doors in a row do.
     chain: spec.hazards.doors >= 2,
     network: counts.network,
+    // The way in this floor holds, taken before the rooms are (as the game does): a hatch up top, a grate on the ground floor.
+    entry:
+      floor === 1 && g.roofHatch
+        ? (open, taken) => g.roofHatch!(cells, cols, rows, dist, taken, open)
+        : floor === 0 && g.tunnelGrate
+          ? (open, taken) => g.tunnelGrate!(cells, cols, rows, dist, taken, exitDist, open)
+          : undefined,
   });
   const guards: VerifyFloor['guards'] = [];
+  let placed = 0;
   const spawn = (kind: EnemyKind, n: number): void => {
     for (let i = 0; i < n; i++) {
+      g.seedRandom(phaseSeed(spec.seed, enemyPhase(floor === 1, placed++)));
       const p = g.placeBotSpawn(cols, rows, dist, used);
       if (p) guards.push({ x: p.x, y: p.y, kind });
     }
@@ -97,16 +110,24 @@ function populate(spec: LevelSpec, g: FloorGenerators, floor: 0 | 1, plan: Plan,
   spawn('alpha', roster.alphas);
   spawn('drone', roster.drones);
   spawn('watchdog', roster.watchdogs);
+  const reseed = (k: number): void => g.seedRandom(phaseSeed(spec.seed, hazardPhase(floor === 1, k)));
+  reseed(0);
   g.placeHidingSpots(cols, rows, dist, used, CRATES);
+  reseed(1);
   const lasers = g.placeLaserTraps(cols, rows, cells, dist, used, spec.hazards.lasers).map((p) => ({ x: p.x, y: p.y }));
   const hazards: VerifyFloor['hazards'] = [];
   const add = (kind: HazardKind, p: Pt): void => void hazards.push({ kind, x: p.x, y: p.y });
+  reseed(2);
   for (const p of g.placeSweepers(cells, cols, rows, dist, used, spec.hazards.sweepers)) add('sweeper', p);
+  reseed(3);
   for (const s of g.placeSliders(cells, cols, rows, dist, used, spec.hazards.sliders, 4, 0)) {
     for (let i = s.from; i <= s.to; i++) add('slider', s.axis === 'x' ? { x: i, y: s.at } : { x: s.at, y: i });
   }
+  reseed(4);
   for (const p of g.placeLines(cells, cols, rows, dist, used, spec.hazards.lines, 1)) add('line', p);
+  reseed(5);
   for (const p of g.placeGates(cells, cols, rows, dist, used, spec.hazards.gates)) add('gate', p);
+  reseed(6);
   for (const p of g.placeShutters(cells, cols, rows, dist, used, spec.hazards.shutters)) add('shutter', p);
   const stations: Station[] = sec.rooms.filter((r) => ['storage', 'terminal', 'server', 'uplink', 'logs'].includes(r.kind)).map((r) => ({ kind: r.kind, x: r.x, y: r.y, keyId: r.keyId }));
   // A contract's steps in the big room: the room's first cell stands for it.
@@ -128,7 +149,9 @@ export function buildFloorForVerify(spec: LevelSpec, g: FloorGenerators): Verify
   }
 }
 
-function build(spec: LevelSpec, g: FloorGenerators): VerifyFloor[] {
+function build(raw: LevelSpec, g: FloorGenerators): VerifyFloor[] {
+  // A sketch with no dead ends for the rooms gets closets opened in its solid blocks (carveAlcoves), as the game's loader does.
+  const spec = raw.grid ? { ...raw, grid: carveAlcoves(raw).grid! } : raw;
   const { cols, rows } = spec.grid ? { cols: spec.grid.cols, rows: spec.grid.rows } : effectiveSize(spec);
   const plan0: Plan = spec.grid ? { cells: gridCells(spec.grid), landmark: null, spur: null } : g.plan(spec.place, spec.layout, 0, cols, rows);
   const start: Pt = spec.grid ? { ...spec.grid.start } : { x: 0, y: 0 };
@@ -140,6 +163,7 @@ function build(spec: LevelSpec, g: FloorGenerators): VerifyFloor[] {
   if (plan0.landmark) for (let y = plan0.landmark.y0; y < plan0.landmark.y0 + plan0.landmark.h; y++) for (let x = plan0.landmark.x0; x < plan0.landmark.x0 + plan0.landmark.w; x++) used0.add(`${x},${y}`);
 
   // The way up, placed before anything else takes a cell: two cells long if there is room, else one.
+  g.seedRandom(phaseSeed(spec.seed, BUILD_PHASE.stair));
   let stair: Spot | null = null;
   if (spec.floors === 2) {
     const long = g.placeStair(cols, rows, plan0.cells, dist0, used0, 2, plan0.spur?.[0]);
@@ -160,6 +184,7 @@ function build(spec: LevelSpec, g: FloorGenerators): VerifyFloor[] {
   let upper: VerifyFloor | null = null;
   if (stair) {
     // (The upper floor is built at the spec's own size, as the game builds it: a silent night shrinks the ground floor only.)
+    g.seedRandom(phaseSeed(spec.seed, BUILD_PHASE.upperPlan));
     const plan1 = g.plan(spec.place, spec.layout, 1, spec.size.cols, spec.size.rows);
     const c1 = plan1.cells;
     // The stairwell doorway (startJob): the landing's outer wall is punched open.
@@ -174,7 +199,7 @@ function build(spec: LevelSpec, g: FloorGenerators): VerifyFloor[] {
     upper = { ...placed, exit: null, stair: null, expect };
   }
   const objectiveHere = objective.steps.some((s) => s.where === 'landmark' && s.floor === 0);
-  const placed = populate(spec, g, 0, plan0, dist0, used0, start, { documents: lowerDocs, network: upper || hasObjective ? ['uplink'] : ['uplink', 'logs'], objectiveHere });
+  const placed = populate(spec, g, 0, plan0, dist0, used0, start, { documents: lowerDocs, network: upper || hasObjective ? ['uplink'] : ['uplink', 'logs'], objectiveHere }, dist0[exit.y]![exit.x]!);
   out.push({ ...placed, exit, stair: stair ? { x: stair.x, y: stair.y } : null, expect: { storage: lowerDocs, stair: spec.floors === 2 } });
   if (upper) out.push(upper);
   return out;

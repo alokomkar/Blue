@@ -13,6 +13,7 @@ import { placeLines } from '../client/game/linelasers.ts';
 import { placeGates } from '../client/game/evade.ts';
 import { placeShutters } from '../client/game/shutters.ts';
 import { planObjectives } from '../client/game/objectives.ts';
+import { roofHatch, tunnelGrate } from '../client/game/entries.ts';
 import { restoreRandom, seedRandom } from '../client/game/seeded.ts';
 
 /**
@@ -40,6 +41,8 @@ const real: FloorGenerators = {
   placeGates,
   placeShutters,
   planObjectives,
+  roofHatch,
+  tunnelGrate,
 };
 
 const spec = (over: Partial<LevelSpec> = {}): LevelSpec => ({ ...defaultSpec(), roster: { ...defaultSpec().roster, guards: 3, watchdogs: 1 }, ...over });
@@ -230,4 +233,31 @@ test('a given grid with a pocket nothing connects is not accepted: V2 names the 
   assert.ok(verdict.failures.some((f) => f.code === 'unreachable' && f.where?.floor === 0));
   assert.ok(verdict.failures.some((f) => /exit/.test(f.message)));
   assert.equal(checkFloors(verdict.floors).ok, false);
+});
+
+test('a sketch of open rooms gets closets for its rooms and a spur for the stair, so the verifier and the game both find them', () => {
+  // Two open rooms joined by a door gap, solid blocks all round: no dead end anywhere, so no records room and no way up until the loader opens some.
+  const cols = 12;
+  const rows = 8;
+  const cells = Array.from({ length: cols * rows }, () => ({ n: false, s: false, e: false, w: false }));
+  const link = (ax: number, ay: number, bx: number, by: number): void => {
+    const a = cells[ay * cols + ax]!;
+    const b = cells[by * cols + bx]!;
+    if (bx === ax + 1) { a.e = true; b.w = true; } else { a.s = true; b.n = true; }
+  };
+  for (const [x0, x1] of [[0, 4], [6, 10]] as const) for (let y = 1; y <= 6; y++) for (let x = x0; x <= x1; x++) { if (x < x1) link(x, y, x + 1, y); if (y < 6) link(x, y, x, y + 1); }
+  link(4, 3, 5, 3);
+  link(5, 3, 6, 3);
+  const grid = { cols, rows, cells, start: { x: 0, y: 3 }, exit: { x: 10, y: 6 } };
+  const s = (over: Partial<LevelSpec>): LevelSpec => ({ ...defaultSpec(), size: { cols, rows }, grid, seed: 5, ...over });
+  for (const seed of [1, 2, 3, 4, 5]) {
+    const one = buildFloorForVerify(s({ floors: 1, seed }), real);
+    assert.equal(one[0]!.stations.filter((st) => st.kind === 'storage').length, 2, `seed ${seed}: the records rooms are placed`);
+    const two = buildFloorForVerify(s({ floors: 2, seed }), real);
+    assert.equal(two.length, 2, `seed ${seed}: the second floor is built`);
+    assert.ok(two[0]!.stair, `seed ${seed}: the stair is placed`);
+    // The loader's verdict: nothing unreachable, no station missing.
+    const verdict = verifyLevel(s({ floors: 2, seed }), real);
+    assert.deepEqual(verdict.failures.filter((f) => f.code === 'station_unreachable' || f.code === 'unreachable'), [], `seed ${seed}`);
+  }
 });

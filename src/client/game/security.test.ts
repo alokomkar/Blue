@@ -208,3 +208,34 @@ test('the uplink closet and the log server get a room each, usually outside the 
   assert.ok(placed / (2 * N) >= 0.9, `only ${placed} of ${2 * N} placed`);
   assert.ok(open / placed >= 0.8, `only ${open} of ${placed} in the open`);
 });
+
+test('on a floor with loops a door only goes where it really seals a section, and the plan stays solvable', () => {
+  // A maze with its walls knocked out here and there (a sketch's rings and open rooms): every door must be a bridge, or it would simply be walked round.
+  let doors = 0;
+  let loops = 0;
+  for (let seed = 1; seed <= 60; seed++) {
+    const d = difficultyFor(8);
+    const { cols, rows } = d;
+    let s = seed * 2654435761;
+    const rnd = (): number => ((s = (Math.imul(s, 1664525) + 1013904223) >>> 0) / 4294967296);
+    const cells = generateMaze(cols, rows);
+    for (let y = 0; y < rows; y++) {
+      for (let x = 0; x < cols; x++) {
+        if (x < cols - 1 && !cells[y]![x]!.E && rnd() < 0.06) { cells[y]![x]!.E = true; cells[y]![x + 1]!.W = true; loops++; }
+        if (y < rows - 1 && !cells[y]![x]!.S && rnd() < 0.06) { cells[y]![x]!.S = true; cells[y + 1]![x]!.N = true; loops++; }
+      }
+    }
+    const { x: ex, y: ey, dist } = farthestCell(cells, cols, rows, 0, 0);
+    const used = new Set<string>(['0,0', `${ex},${ey}`]);
+    const plan = planSecurity(cells, cols, rows, dist, { x: 0, y: 0 }, used, { doors: 2, storage: 2, decor: 2, chain: false, network: ['uplink', 'logs'] });
+    for (const door of plan.doors) {
+      doors++;
+      const nav = navCellsFor(cells, [door], cols, rows);
+      const reach = bfs(nav, cols, rows, 0, 0);
+      const beyond = { x: door.x + DIR_DELTA[door.dir][0], y: door.y + DIR_DELTA[door.dir][1] };
+      assert.equal(reach[beyond.y]![beyond.x]!, -1, `seed ${seed}: door ${door.id} at ${door.x},${door.y} ${door.dir} is walked round`);
+    }
+    assert.equal(simulateUnlocks(cells, cols, rows, plan).size, plan.doors.length, `seed ${seed}: unlockable`);
+  }
+  assert.ok(loops > 100 && doors > 10, `loops ${loops}, doors ${doors}`);
+});

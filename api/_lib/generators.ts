@@ -12,6 +12,7 @@ import { placeLines } from '../../src/client/game/linelasers.ts';
 import { placeGates } from '../../src/client/game/evade.ts';
 import { placeShutters } from '../../src/client/game/shutters.ts';
 import { planObjectives } from '../../src/client/game/objectives.ts';
+import { roofHatch, tunnelGrate } from '../../src/client/game/entries.ts';
 import { restoreRandom, seedRandom } from '../../src/client/game/seeded.ts';
 
 export const generators: FloorGenerators = {
@@ -35,4 +36,6 @@ export const generators: FloorGenerators = {
   placeGates,
   placeShutters,
   planObjectives,
+  roofHatch,
+  tunnelGrate,
 };

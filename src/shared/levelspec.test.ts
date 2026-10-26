@@ -6,6 +6,10 @@ import {
   BRIEF_MAX,
   LAYOUT_IDS,
   LEVEL_SPEC_SCHEMA,
+  BUILD_PHASE,
+  MAX_ALCOVES,
+  carveAlcoves,
+  phaseSeed,
   MAX_SEED,
   MAX_TWISTS,
   PLACE_IDS,
@@ -13,6 +17,7 @@ import {
   TITLE_MAX,
   TWIST_IDS,
   clampSpec,
+  type GridCell,
   defaultSpec,
   effectiveSize,
   fitsContract,
@@ -380,6 +385,45 @@ test('a grid that cannot be used is dropped, and one that can be repaired is rep
   assert.deepEqual(inspectSpec(fixed.spec).problems, []);
 });
 
+test('a start or exit in a solid block moves onto the floor, and a grid with no floor is dropped', () => {
+  const d = defaultSpec();
+  const solid = () => ({ n: false, s: false, e: false, w: false });
+  const cells = Array.from({ length: 30 }, solid);
+  for (let x = 1; x < 4; x++) cells[6 + x] = { n: false, s: false, e: x < 3, w: true };
+  cells[6 + 1] = { n: false, s: false, e: true, w: false };
+  cells[6 + 2] = { n: false, s: false, e: true, w: true };
+  cells[6 + 3] = { n: false, s: false, e: false, w: true };
+  const grid = { cols: 6, rows: 5, cells, start: { x: 0, y: 0 }, exit: { x: 5, y: 4 } };
+  const fixed = clampSpec({ ...d, size: { cols: 6, rows: 5 }, grid });
+  assert.deepEqual(fixed.spec.grid!.start, { x: 1, y: 1 });
+  assert.deepEqual(fixed.spec.grid!.exit, { x: 3, y: 1 });
+  assert.equal(fixed.changes.length, 2);
+  assert.deepEqual(inspectSpec(fixed.spec).problems, []);
+  // A start walled in alone: the exit is another open cell, for the verifier to call unreachable, never the start itself.
+  const lone = Array.from({ length: 30 }, solid);
+  lone[0] = { n: false, s: false, e: true, w: false };
+  lone[1] = { n: false, s: false, e: false, w: true };
+  lone[20] = { n: false, s: false, e: true, w: false };
+  lone[21] = { n: false, s: false, e: false, w: true };
+  const walled = clampSpec({ ...d, grid: { cols: 6, rows: 5, cells: lone, start: { x: 0, y: 0 }, exit: { x: 0, y: 0 } } });
+  assert.notDeepEqual(walled.spec.grid!.exit, walled.spec.grid!.start);
+  // Fewer than two cells with an opening is no floor.
+  const none = clampSpec({ ...d, grid: { cols: 6, rows: 5, cells: Array.from({ length: 30 }, solid), start: { x: 0, y: 0 }, exit: { x: 1, y: 0 } } });
+  assert.equal(none.spec.grid, undefined);
+  assert.equal(none.changes.length, 1);
+});
+
+test('the grid is read from a reply but is not part of the schema a model is held to', () => {
+  const props = LEVEL_SPEC_SCHEMA.properties as Record<string, unknown>;
+  assert.equal('grid' in props, false);
+  assert.equal((LEVEL_SPEC_SCHEMA.required as string[]).includes('grid'), false);
+  // (A photo gives the walls, through scan.ts; a model that sends them anyway is read, not refused.)
+  const row = (x: number) => ({ n: false, s: false, e: x < 5, w: x > 0 });
+  const cells = Array.from({ length: 30 }, (_, i) => (i < 6 ? row(i) : { n: false, s: false, e: false, w: false }));
+  const parsed = parseSpec(JSON.stringify({ ...defaultSpec(), grid: { cols: 6, rows: 5, cells, start: { x: 0, y: 0 }, exit: { x: 5, y: 0 } } }));
+  assert.ok(parsed.ok && parsed.spec.grid);
+});
+
 // ---------------------------------------------------------------------------------------------------------------------
 
 test('a spec laid over a job\'s settings sets size, floors, roster, hazards and loot, and leaves the rest of the job alone', () => {
@@ -422,4 +466,61 @@ test('a spec at the hardest job\'s own numbers reproduces that job', () => {
   };
   assert.deepEqual(clampSpec(spec).changes, []);
   assert.deepEqual(specToDifficulty(spec, job), job);
+});
+
+test('each build phase draws from its own seed, the same for the same spec seed', () => {
+  const phases = Object.values(BUILD_PHASE);
+  for (const seed of [0, 1, 99, 0xffffffff]) {
+    const seeds = phases.map((p) => phaseSeed(seed, p));
+    assert.equal(new Set(seeds).size, phases.length, `seed ${seed}`);
+    assert.ok(seeds.every((s) => Number.isInteger(s) && s > 0 && s <= 0xffffffff));
+    assert.deepEqual(seeds, phases.map((p) => phaseSeed(seed, p)));
+  }
+  assert.notEqual(phaseSeed(1, BUILD_PHASE.stair), phaseSeed(2, BUILD_PHASE.stair));
+});
+
+test('a sketch of open rooms with no dead ends gets closets for its rooms, and one that has enough is left alone', () => {
+  // Two open rooms (4 x 4 and 4 x 4) joined by a door gap, with solid blocks round them: no cell has a single opening.
+  const cols = 10;
+  const rows = 6;
+  const cells = Array.from({ length: cols * rows }, () => ({ n: false, s: false, e: false, w: false }));
+  const link = (ax: number, ay: number, bx: number, by: number): void => {
+    const a = cells[ay * cols + ax]!;
+    const b = cells[by * cols + bx]!;
+    if (bx === ax + 1) { a.e = true; b.w = true; } else if (by === ay + 1) { a.s = true; b.n = true; }
+  };
+  for (const [x0, x1] of [[0, 3], [5, 8]] as const) for (let y = 1; y <= 4; y++) for (let x = x0; x <= x1; x++) { if (x < x1) link(x, y, x + 1, y); if (y < 4) link(x, y, x, y + 1); }
+  cells[2 * cols + 4] = { n: false, s: false, e: true, w: true };
+  cells[2 * cols + 3]!.e = true;
+  cells[2 * cols + 5]!.w = true;
+  const grid = { cols, rows, cells, start: { x: 0, y: 2 }, exit: { x: 8, y: 4 } };
+  const spec = { ...defaultSpec(), floors: 1 as const, contract: 'records' as const, loot: { documents: 2 }, grid };
+  const out = carveAlcoves(spec);
+  assert.ok(out.carved.length >= 2 && out.carved.length <= MAX_ALCOVES, `carved ${out.carved.length}`);
+  for (const c of out.carved) {
+    const cell = out.grid!.cells[c.y * cols + c.x]!;
+    assert.equal([cell.n, cell.s, cell.e, cell.w].filter(Boolean).length, 1, `closet ${c.x},${c.y} has one opening`);
+  }
+  // Both cells agree on every new opening, the start and exit are untouched, and the result is already enough: a second pass changes nothing.
+  assert.deepEqual(out.grid!.start, grid.start);
+  assert.deepEqual(out.grid!.exit, grid.exit);
+  assert.deepEqual(inspectSpec({ ...spec, grid: out.grid }).problems.filter((p) => p.field.startsWith('grid')), []);
+  assert.deepEqual(carveAlcoves({ ...spec, grid: out.grid! }).carved, []);
+  // A second floor also needs a way up: a straight two-cell pocket, its far end a dead end to the east or south (maze.ts's placeStair).
+  const up = carveAlcoves({ ...spec, floors: 2 });
+  const spur = up.carved.slice(-2);
+  assert.equal(up.carved.length, out.carved.length + 2);
+  const [a0, b0] = spur.map((c) => up.grid!.cells[c.y * cols + c.x]!) as [GridCell, GridCell];
+  assert.ok((a0.n && a0.s && !a0.e && !a0.w) || (a0.e && a0.w && !a0.n && !a0.s), 'the stair cell is straight');
+  assert.equal([b0.n, b0.s, b0.e, b0.w].filter(Boolean).length, 1, 'with a dead end past it');
+  assert.ok(spur[1]!.x > spur[0]!.x || spur[1]!.y > spur[0]!.y, 'to the east or south');
+  assert.deepEqual(carveAlcoves({ ...spec, floors: 2, grid: up.grid! }).carved, []);
+  // The input is not touched.
+  assert.ok(cells.every((c, i) => c === grid.cells[i]) && !cells[0]!.n);
+  // A contract with no records needs two (the uplink and the log server), and a sketch with no grid is nothing to do.
+  assert.ok(carveAlcoves({ ...spec, contract: 'sabotage' }).carved.length <= out.carved.length);
+  assert.deepEqual(carveAlcoves({ ...defaultSpec() }), { grid: null, carved: [] });
+  // A grid with nowhere to carve (no solid cell) is returned as it is.
+  const dense = { cols: 6, rows: 5, cells: Array.from({ length: 30 }, (_, i) => ({ n: i >= 6, s: i < 24, e: i % 6 < 5, w: i % 6 > 0 })), start: { x: 0, y: 0 }, exit: { x: 5, y: 4 } };
+  assert.deepEqual(carveAlcoves({ ...defaultSpec(), grid: dense }).carved, []);
 });

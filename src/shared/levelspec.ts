@@ -57,6 +57,18 @@ export type LevelSpec = {
   grid?: SpecGrid;
 };
 
+/**
+ * The seed a build phase draws from. The game builds a floor with a great deal between the layout steps that draws random numbers too (decor, lamps, patrol routes), which the
+ * verifier's pure build does not, so one stream from the start would drift apart after the first floor plan. Both reseed from here at the same few points (the stair and the
+ * contract's steps, the upper plan, each floor's doors and rooms, each enemy, each hazard), so what the verifier checks of the plan, the exit, the stair, the doors and the rooms is what the game builds.
+ */
+export const BUILD_PHASE = { stair: 1, upperPlan: 2, upperSecurity: 3, groundSecurity: 4 } as const;
+/** The phase of the `n`th enemy placed on a floor (guards, then mines, alphas, drones and dogs): each from its own seed, since making the one before draws random numbers (its patrol) too. */
+export const enemyPhase = (upper: boolean, n: number): number => (upper ? 300 : 400) + n;
+/** The phase of hazard `k` on a floor (the crates, 0; then the trip lasers, sweepers, sliders, lines, gates and shutters, 1 to 6): each is placed from its own seed, because building the one before draws random numbers too. */
+export const hazardPhase = (upper: boolean, k: number): number => (upper ? 100 : 150) + k;
+export const phaseSeed = (seed: number, phase: number): number => (((seed >>> 0) ^ Math.imul(phase, 0x9e3779b1)) >>> 0) || 1;
+
 export const TITLE_MAX = 60;
 export const BRIEF_MAX = 200;
 export const MAX_TWISTS = 2;
@@ -312,10 +324,25 @@ function readGrid(r: Reader, raw: unknown): SpecGrid | null {
     }
   }
   if (fixed > 0) r.bad('grid.cells', `${fixed} cells had an opening the cell beside it did not share, or one off the edge; closed them`);
-  const start = inGrid(raw.start, cols, rows) ? { x: raw.start.x, y: raw.start.y } : { x: 0, y: 0 };
-  if (!inGrid(raw.start, cols, rows)) r.bad('grid.start', `grid.start must be a cell of the grid; using ${start.x},${start.y}`);
+  // A floor is the cells with an opening; the rest are solid blocks (layouts.ts's utility cores). Fewer than a start and an exit's worth is no floor.
+  const open = (p: Pt): boolean => {
+    const c = cells[p.y * cols + p.x]!;
+    return c.n || c.s || c.e || c.w;
+  };
+  const firstOpen = cells.findIndex((c) => c.n || c.s || c.e || c.w);
+  if (cells.filter((c) => c.n || c.s || c.e || c.w).length < 2) {
+    r.bad('grid.cells', 'grid.cells has fewer than two cells with an opening, so there is no floor to walk; grid dropped');
+    return null;
+  }
+  // The start and the exit are on the floor: a lift cannot stand in a solid block.
+  let start: Pt;
+  if (inGrid(raw.start, cols, rows) && open(raw.start)) start = { x: raw.start.x, y: raw.start.y };
+  else {
+    start = { x: firstOpen % cols, y: Math.floor(firstOpen / cols) };
+    r.bad('grid.start', `grid.start must be a cell of the grid with an opening; using ${start.x},${start.y}`);
+  }
   let exit: Pt;
-  if (inGrid(raw.exit, cols, rows) && !(raw.exit.x === start.x && raw.exit.y === start.y)) exit = { x: raw.exit.x, y: raw.exit.y };
+  if (inGrid(raw.exit, cols, rows) && open(raw.exit) && !(raw.exit.x === start.x && raw.exit.y === start.y)) exit = { x: raw.exit.x, y: raw.exit.y };
   else {
     // The farthest cell by walking, as the game picks its own exit.
     const dist = gridDistances(cells, cols, rows, start);
@@ -327,9 +354,121 @@ function readGrid(r: Reader, raw: unknown): SpecGrid | null {
         exit = { x: i % cols, y: Math.floor(i / cols) };
       }
     }
-    r.bad('grid.exit', `grid.exit must be a cell of the grid other than the start; using the farthest cell, ${exit.x},${exit.y}`);
+    // (A start walled off from every other open cell has nowhere to walk to: any other open cell, for the verifier to report as unreachable.)
+    if (exit.x === start.x && exit.y === start.y) {
+      const other = cells.findIndex((c, i) => i !== start.y * cols + start.x && (c.n || c.s || c.e || c.w));
+      exit = { x: other % cols, y: Math.floor(other / cols) };
+    }
+    r.bad('grid.exit', `grid.exit must be a cell of the grid with an opening, other than the start; using the farthest cell, ${exit.x},${exit.y}`);
   }
   return { cols, rows, cells, start, exit };
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Closets for a sketch with no dead ends.
+
+/** security.ts's ROOM_MIN_DIST: a room's pocket is at least this many steps from the start. */
+const ROOM_MIN_STEPS = 3;
+/** The most closets opened into a sketch's solid blocks (a sketch needs a handful, never a warren). */
+export const MAX_ALCOVES = 6;
+
+/**
+ * The game puts its rooms (the records rooms, the uplink closet, the log server) in dead-end pockets, one opening each, and the floors it generates are full of them. A sketch
+ * drawn as open rooms joined by door gaps has none, and a floor with no pocket has nowhere to put a file: the contract could not be played. So, for a spec with a grid whose dead
+ * ends fall short of what it needs (its documents, on a records job, and the uplink and log server), this opens one-cell closets into its solid blocks, off the cells that are
+ * already a corridor or a room (never the start, the exit or another dead end), spread as far from one another as the grid allows. A sketch that has enough is returned as it is.
+ * The game and the verifier both read the grid through this, so what is verified is what is built. Pure.
+ */
+export function carveAlcoves(spec: Pick<LevelSpec, 'grid' | 'contract' | 'loot' | 'floors'>): { grid: SpecGrid | null; carved: Pt[] } {
+  const grid = spec.grid;
+  if (!grid) return { grid: null, carved: [] };
+  const { cols, rows } = grid;
+  const cells = grid.cells.map((c) => ({ ...c }));
+  const at = (x: number, y: number): GridCell => cells[y * cols + x]!;
+  const openings = (c: GridCell): number => (c.n ? 1 : 0) + (c.s ? 1 : 0) + (c.e ? 1 : 0) + (c.w ? 1 : 0);
+  const want = (spec.contract === 'records' ? spec.loot.documents : 0) + 2;
+  const isEnd = (x: number, y: number, dist: number[]): boolean => openings(at(x, y)) === 1 && !(x === grid.start.x && y === grid.start.y) && !(x === grid.exit.x && y === grid.exit.y) && dist[y * cols + x]! >= ROOM_MIN_STEPS;
+  const carved: Pt[] = [];
+  for (let n = 0; n < MAX_ALCOVES; n++) {
+    const dist = gridDistances(cells, cols, rows, grid.start);
+    const ends: Pt[] = [];
+    for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) if (isEnd(x, y, dist)) ends.push({ x, y });
+    if (ends.length >= want) break;
+    let best: { at: Pt; from: Pt; dir: 'n' | 's' | 'e' | 'w'; score: number } | null = null;
+    for (let y = 0; y < rows; y++) {
+      for (let x = 0; x < cols; x++) {
+        if (openings(at(x, y)) !== 0) continue;
+        for (const [dir, dx, dy] of [['n', 0, -1], ['s', 0, 1], ['e', 1, 0], ['w', -1, 0]] as const) {
+          const px = x + dx;
+          const py = y + dy;
+          if (px < 0 || py < 0 || px >= cols || py >= rows) continue;
+          const parent = at(px, py);
+          const reach = dist[py * cols + px]!;
+          // A passage or a room to open off (two or more openings already), reached from the start, far enough that the pocket is too, and not where the lift or the way out stand.
+          if (openings(parent) < 2 || reach < ROOM_MIN_STEPS - 1 || (px === grid.start.x && py === grid.start.y) || (px === grid.exit.x && py === grid.exit.y)) continue;
+          const score = Math.min(99, ...ends.map((e) => Math.abs(e.x - x) + Math.abs(e.y - y)));
+          if (!best || score > best.score) best = { at: { x, y }, from: { x: px, y: py }, dir, score };
+        }
+      }
+    }
+    if (!best) break;
+    const opposite = { n: 's', s: 'n', e: 'w', w: 'e' } as const;
+    at(best.at.x, best.at.y)[best.dir] = true;
+    at(best.from.x, best.from.y)[opposite[best.dir]] = true;
+    carved.push(best.at);
+  }
+  // A second floor needs a way up: maze.ts's placeStair wants a straight cell (open on two opposite sides only) with a dead end past it to the east or south.
+  if (spec.floors === 2 && !hasSpur(cells, cols, rows, grid)) {
+    const dist = gridDistances(cells, cols, rows, grid.start);
+    let best: { p: Pt; dir: 'e' | 's'; score: number } | null = null;
+    for (let y = 0; y < rows; y++) {
+      for (let x = 0; x < cols; x++) {
+        if (openings(at(x, y)) < 2 || dist[y * cols + x]! < ROOM_MIN_STEPS - 1) continue;
+        for (const [dir, dx, dy] of [['e', 1, 0], ['s', 0, 1]] as const) {
+          const ax = x + dx;
+          const ay = y + dy;
+          const bx = ax + dx;
+          const by = ay + dy;
+          if (bx >= cols || by >= rows || openings(at(ax, ay)) !== 0 || openings(at(bx, by)) !== 0) continue;
+          if ((ax === grid.exit.x && ay === grid.exit.y) || (bx === grid.exit.x && by === grid.exit.y)) continue;
+          const score = dist[y * cols + x]!;
+          if (!best || score > best.score) best = { p: { x, y }, dir, score };
+        }
+      }
+    }
+    if (best) {
+      const [dx, dy] = best.dir === 'e' ? [1, 0] : [0, 1];
+      const a = { x: best.p.x + dx, y: best.p.y + dy };
+      const b = { x: a.x + dx, y: a.y + dy };
+      const [out, back] = best.dir === 'e' ? (['e', 'w'] as const) : (['s', 'n'] as const);
+      at(best.p.x, best.p.y)[out] = true;
+      at(a.x, a.y)[back] = true;
+      at(a.x, a.y)[out] = true;
+      at(b.x, b.y)[back] = true;
+      carved.push(a, b);
+    }
+  }
+  return carved.length ? { grid: { ...grid, cells }, carved } : { grid, carved };
+}
+
+/** Whether maze.ts's placeStair could put a stair in these cells (one cell long): a straight cell, three or more steps from the start and not the exit, with a dead end next to it to the east or south. */
+function hasSpur(cells: GridCell[], cols: number, rows: number, grid: SpecGrid): boolean {
+  const dist = gridDistances(cells, cols, rows, grid.start);
+  const count = (c: GridCell): number => (c.n ? 1 : 0) + (c.s ? 1 : 0) + (c.e ? 1 : 0) + (c.w ? 1 : 0);
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      const c = cells[y * cols + x]!;
+      if (dist[y * cols + x]! < 3 || (x === grid.start.x && y === grid.start.y) || (x === grid.exit.x && y === grid.exit.y)) continue;
+      const ns = c.n && c.s && !c.e && !c.w;
+      const ew = c.e && c.w && !c.n && !c.s;
+      if (!ns && !ew) continue;
+      const fx = ns ? x : x + 1;
+      const fy = ns ? y + 1 : y;
+      if (fx >= cols || fy >= rows || (fx === grid.exit.x && fy === grid.exit.y)) continue;
+      if (count(cells[fy * cols + fx]!) === 1) return true;
+    }
+  }
+  return false;
 }
 
 const TOP_KEYS = ['version', 'title', 'brief', 'place', 'layout', 'size', 'floors', 'seed', 'contract', 'twists', 'roster', 'hazards', 'loot', 'grid'] as const;
