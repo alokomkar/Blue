@@ -2724,6 +2724,90 @@ body.touch-ui .trap-aim-btn {
   color: #f2b6bf;
 }
 
+/* ---- the guards' radio: a short feed of check-ins and the control room's calls (radiofeed.ts). Bottom left, clear of the gun bar and the toasts; it never takes a click. ---- */
+.radio-feed {
+  position: absolute;
+  left: max(16px, env(safe-area-inset-left));
+  bottom: calc(24px + env(safe-area-inset-bottom));
+  width: min(320px, calc(100vw - 32px));
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  pointer-events: none;
+  font: 600 11.5px/1.35 ui-monospace, 'IBM Plex Mono', Menlo, Consolas, monospace;
+  letter-spacing: 0.06em;
+}
+
+.radio-line {
+  padding: 4px 9px 4px 8px;
+  border-left: 3px solid rgba(111, 207, 151, 0.7);
+  border-radius: 2px;
+  background: rgba(8, 14, 12, 0.8);
+  color: rgba(204, 236, 218, 0.92);
+  animation: radio-in 0.18s ease-out;
+  transition: opacity 0.6s ease;
+}
+
+.radio-line.fading {
+  opacity: 0;
+}
+
+/* A routine check-in is quiet; a miss, the alert and the control room's counters are what to read. */
+.radio-line.miss {
+  border-left-color: #ffb02e;
+  background: rgba(30, 22, 6, 0.8);
+  color: #ffd488;
+}
+
+.radio-line.alert {
+  border-left-color: #ff4a3d;
+  background: rgba(36, 8, 6, 0.85);
+  color: #ffb4ac;
+}
+
+.radio-line.counter {
+  border-left-color: #6fb7ff;
+  background: rgba(8, 18, 34, 0.85);
+  color: #bcdcff;
+}
+
+.radio-line.static {
+  border-left-color: #8a96a3;
+  background: rgba(12, 14, 18, 0.8);
+  color: #aab4be;
+  font-style: italic;
+}
+
+@keyframes radio-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+body.map-open .radio-feed,
+body.modal-open .radio-feed {
+  display: none;
+}
+
+/* On a phone it sits at the top, under the row of buttons, narrow, so the sticks and the buttons keep the bottom. */
+@media (pointer: coarse), (max-width: 620px), (max-height: 480px) {
+  .radio-feed {
+    bottom: auto;
+    top: calc(env(safe-area-inset-top) + 50px);
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(300px, 52vw);
+    font-size: 9.5px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .radio-line {
+    animation: none;
+  }
+}
+
 /* ---- spotted banner: a brief full-screen dramatic flash of text ---- */
 .danger-vignette {
   position: fixed;
