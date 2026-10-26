@@ -291,11 +291,36 @@ Rooms recovered from the sketch, as a 16 x 16 grid (digits are rooms, dots are w
 |---|---|
 | ![director page](img/director-page.jpg) | ![generated level](img/director-game.jpg) |
 
+### 60ed1b8 · 23:31 · History: the Director page and the filter fix
+- **Input:** you asked that the local HTML files are updated as features land.
+- **Output:** the entry for the Director page and its two screenshots, the regenerated pages.
+- **In plain terms:** the diary is kept up as we go.
+
+### 3162781 · 23:55 · Spec loader groundwork: grid support, seeded build phases, and fixes for floors with loops
+- **Input:** the plan's spike 2: does the game cope with a floor that has loops (a photo-to-map sketch is not a tree; the
+  game's mazes always were)? A helper built the spec loader and tested two hand-made grids: a ring corridor round a
+  block with a side room, and a three-room plan like the sketch.
+- **Output:** the loader reads `game.html?spec=<base64url JSON>` on any host (`&coop=ai` adds the partner), plus a
+  `window.__loadSpec` hook; an unreadable spec leaves the brief up with a red "LEVEL SPEC NOT READ" toast, and an
+  adjusted one says what the clamp changed. The same spec twice gives the identical level (cells, rooms, doors, enemies,
+  lasers, crates, exit, stair); the game's plan, exit, stair, rooms and lasers match the verifier's build exactly on 7
+  specs. **Three tree-shaped assumptions found and fixed:** doors were placed on loop passages and simply walked round
+  (7 of 23 bypassable at 5% loops, all at 15%; now on bridge passages only); room pockets need dead ends, so a sketch
+  with none got no records rooms and the exit unlocked at once (up to six closets are now opened); and the stair
+  spur could be missed by 300 random tries (now scans every cell). **Spike 2 result:** both grids pass solo and with the
+  partner (lifts, patrols covering the whole ring both ways, every target reachable, all five non-records contracts
+  place their stations); one two-floor three-room seed (11) failed, probably a test-harness artefact, seeds 1 to 4 pass; the
+  partner was downed in 3 of 6 live-enemy runs on looped grids against 0 of 3 on tree grids, too few to conclude.
+  Checked on its own in a clean copy: type-check clean, 954 tests pass, lint clean.
+- **In plain terms:** a hand-drawn plan with loops can be played, and the game's own level builder no longer assumes
+  every floor is a tree. The page side of the loader (`game.ts`) is written but is waiting to be committed together
+  with the gameplay helpers' edits, which share that file.
+
 ### Phase 1 summary (so far, in progress)
 - **Achieved:** the Heist Director end to end (the server loop, plus a page where you describe a level, watch the repair rounds and play the result; the model's content filter tamed from about 25% to 0 of 20);  the API plumbing with a safe key path; the level spec and verifier; the Meta key tested against every
   model we plan to use; the three biggest risks (SAM on a sketch, structured output, voice latency) answered with real
   numbers; co-op on all four levels.
-- **Numbers:** 940 unit tests at the latest commit (836 at the baseline), lint and type-check clean, 25 commits.
-- **Still open in this phase:** loading a spec into the game (`?spec=`; a helper is on it), the loop test (a layout with a
-  loop, which the game's tree-shaped mazes never had), the Vercel deployment, and your three real sketch photos.
+- **Numbers:** 940 unit tests at the latest commit (836 at the baseline), lint and type-check clean, 27 commits.
+- **Also achieved:** the loop test passed after three fixes, and `?spec=` loads a level from a spec (its `game.ts` half is written and waits to be committed with the gameplay edits).
+- **Still open in this phase:** the Vercel deployment, and your three real sketch photos. The verifier does not yet flag doors or lasers silently dropped on a looped grid, and start and exit should sit in dead ends or corners.
 - **Next:** the voice fast path, then the photo-to-map endpoint. In parallel (gameplay track, in progress): radio check-ins and habit counters, and tower snipers.
