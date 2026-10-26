@@ -52,8 +52,12 @@ test('far behind, it turns, walks, and runs when well behind', () => {
 test('it copies the leader’s posture and does not run when the leader is lying flat', () => {
   const t = new Trail();
   for (let z = 0; z <= 20; z += 0.5) t.push(0, z);
-  const sneaking = followInput({ x: 0, z: 0, angle: 0 }, leaderAt(0, 20, 0, { sneak: true }), t);
+  const sneaking = followInput({ x: 0, z: 0, angle: 0 }, leaderAt(0, 3, 0, { sneak: true }), t);
   assert.equal(sneaking.sneak, true);
+  // ...but well behind a sneaking leader it runs to catch up (a sneak cannot dash).
+  const behind = followInput({ x: 0, z: 0, angle: 0 }, leaderAt(0, 20, 0, { sneak: true }), t);
+  assert.equal(behind.sneak, false);
+  assert.equal(behind.dash, true);
   const flat = followInput({ x: 0, z: 0, angle: 0 }, leaderAt(0, 20, 0, { prone: true }), t);
   assert.equal(flat.prone, true);
   assert.equal(flat.dash, false);
@@ -200,4 +204,68 @@ test('a downed partner keeps the agent in only a few seconds: the exit then take
   assert.equal(mayLeaveWithout('down', LEAVE_DOWNED_S - 0.1), false);
   assert.equal(mayLeaveWithout('down', LEAVE_DOWNED_S), true);
   assert.equal(mayLeaveWithout('free', 99), false); // a partner on their feet is waited for, not left
+});
+
+test('the way between floors is the shortest chain of stairs and lifts, taken from where it stands', async () => {
+  const { nextLink } = await import('./companion.ts');
+  // The tower: stairs 0-1, the lift 0-1, 1-2 and 2-3 (the last one locked: not offered).
+  const links = [
+    { a: 0, b: 1, kind: 'stair' as const, ref: 0 },
+    { a: 0, b: 1, kind: 'lift' as const, ref: 0 },
+    { a: 1, b: 2, kind: 'lift' as const, ref: 1 },
+  ];
+  assert.equal(nextLink(links, 0, 0), null);
+  assert.deepEqual(nextLink(links, 0, 1)?.kind, 'stair'); // (the first listed of the equally short)
+  assert.deepEqual(nextLink(links, 0, 2), links[0]); // up the stair first, then the lift
+  assert.deepEqual(nextLink(links, 2, 0), links[2]); // down: the lift to 1 first
+  assert.equal(nextLink(links, 0, 3), null); // no way (a climb or a drop took you there)
+  assert.equal(nextLink([], 0, 1), null);
+  // A one-way flight (the bunker's) is only taken the way it goes.
+  const oneWay = [{ a: 0, b: 1, kind: 'stair' as const, ref: 0, oneWay: true }, { a: 1, b: 0, kind: 'stair' as const, ref: 1, oneWay: true }];
+  assert.equal(nextLink(oneWay, 0, 1)?.ref, 0);
+  assert.equal(nextLink(oneWay, 1, 0)?.ref, 1);
+  assert.equal(nextLink([oneWay[0]!], 1, 0), null);
+});
+
+test('a flight is used from the cell before its first step, to the cell past its last', async () => {
+  const { flightEnds } = await import('./companion.ts');
+  const along = flightEnds({ x: 1, y: 1, spanX: true, run: 3, fromFloorY: 0, toFloorY: 4 }, 4);
+  assert.deepEqual(along.footCell, { x: 1, y: 0 });
+  assert.deepEqual(along.headCell, { x: 1, y: 4 });
+  assert.deepEqual(along.foot, { x: 4, z: 0 });
+  assert.deepEqual(along.head, { x: 4, z: 16 });
+  const across = flightEnds({ x: 5, y: 2, spanX: false, run: 2, fromFloorY: 7, toFloorY: 0 }, 4);
+  assert.deepEqual(across.footCell, { x: 4, y: 2 });
+  assert.deepEqual(across.headCell, { x: 7, y: 2 });
+});
+
+test('with you up where it cannot go, it waits at the reachable cell nearest to you', async () => {
+  const { nearestOpenCell } = await import('./companion.ts');
+  const dist = [
+    [0, 1, 2, -1],
+    [-1, -1, 3, -1],
+    [-1, -1, 4, 5],
+  ];
+  assert.deepEqual(nearestOpenCell(dist, 3, 0), { x: 2, y: 0 });
+  assert.deepEqual(nearestOpenCell(dist, 3, 2), { x: 3, y: 2 });
+  assert.equal(nearestOpenCell([[-1, -1]], 0, 0), null);
+  // Leaving out a cell the walker cannot get at (across a wall) gives the next nearest.
+  assert.deepEqual(nearestOpenCell(dist, 3, 0, (x) => x !== 2), { x: 1, y: 0 });
+});
+
+test('a walker that is not getting anywhere is put back sooner on your floor than on another', async () => {
+  const { wedged, WEDGED_S, WEDGED_FAR_S } = await import('./companion.ts');
+  assert.equal(wedged(WEDGED_S - 0.1, true), false);
+  assert.equal(wedged(WEDGED_S + 0.1, true), true);
+  assert.equal(wedged(WEDGED_S + 0.1, false), false);
+  assert.equal(wedged(WEDGED_FAR_S + 0.1, false), true);
+});
+
+test('going to you by the corridors starts far off and holds until it is near (no dithering at the edge)', async () => {
+  const { byCorridors, NAV_FAR, NAV_NEAR } = await import('./companion.ts');
+  assert.equal(byCorridors(false, NAV_FAR - 0.1), false);
+  assert.equal(byCorridors(false, NAV_FAR + 0.1), true);
+  assert.equal(byCorridors(true, NAV_FAR - 0.5), true); // still on its way
+  assert.equal(byCorridors(true, NAV_NEAR + 0.1), true);
+  assert.equal(byCorridors(true, NAV_NEAR - 0.1), false);
 });

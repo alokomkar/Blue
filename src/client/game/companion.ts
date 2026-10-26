@@ -116,7 +116,9 @@ export function followInput(me: Pt & { angle: number }, leader: Leader, trail: T
   const spot = followTarget(me, leader, trail);
   const dist = Math.hypot(spot.x - me.x, spot.z - me.z);
   const away = Math.hypot(leader.x - me.x, leader.z - me.z);
-  const stance = { sneak: leader.sneak, prone: leader.prone };
+  // (Well behind a leader who is sneaking, it runs to catch up rather than creeping after them: a sneak cannot dash.)
+  const catching = away > CATCH_UP && !leader.prone;
+  const stance = { sneak: leader.sneak && !catching, prone: leader.prone };
   if (dist < STOP && away < GAP * 2) {
     // There, or near enough: watch the back, the way opposite to where the leader looks.
     return { turn: turnToward(me.angle, leader.angle + Math.PI), throttle: 0, ...stance, dash: false };
@@ -125,7 +127,7 @@ export function followInput(me: Pt & { angle: number }, leader: Leader, trail: T
   const off = Math.abs(wrap(want - me.angle));
   const turn = turnToward(me.angle, want);
   // Walk once roughly facing the spot, slower as it closes in; fall further behind than a leash and it runs.
-  const far = away > CATCH_UP && !leader.prone;
+  const far = catching;
   const throttle = off > 1.1 ? 0.15 : Math.max(0.25, Math.min(1, (dist - STOP) / 0.8 + 0.25));
   return { turn, throttle, ...stance, dash: far || (leader.dash && dist > 1) };
 }
@@ -238,4 +240,91 @@ export function coverScore(spot: { px: number; pz: number; nx: number; nz: numbe
 /** Whether the exit takes the agent without a partner who is down: the agent has waited in the open cab long enough for them. A downed partner must not keep the agent in (a fuse running, hunters coming). */
 export function mayLeaveWithout(state: PartnerState, waitedInCab: number): boolean {
   return state === 'down' && waitedInCab >= LEAVE_DOWNED_S;
+}
+
+// ---- following between floors, and when you are somewhere it cannot walk ----
+
+/** A way between two floors the partner can use on its own: a flight of stairs, or a lift (it rides it where you would). */
+export type FloorLink = { a: number; b: number; kind: 'stair' | 'lift'; ref: number; /** Usable only from `a` to `b` (the bunker's flights: one each way, walled at the far end the other way). */ oneWay?: boolean };
+
+/**
+ * The first link to take, from floor `from`, to get to floor `to` by the shortest chain of links (each one goes either way); null when there is no way (a climb, a shaft or a
+ * drop took you there), or when it is already there.
+ */
+export function nextLink<T extends FloorLink>(links: readonly T[], from: number, to: number): T | null {
+  if (from === to) return null;
+  const first = new Map<number, T>(); // floor -> the first link of the way to it
+  const queue: number[] = [from];
+  const seen = new Set<number>([from]);
+  for (let qi = 0; qi < queue.length; qi++) {
+    const at = queue[qi]!;
+    for (const l of links) {
+      const other = l.a === at ? l.b : l.b === at && !l.oneWay ? l.a : null;
+      if (other === null || seen.has(other)) continue;
+      seen.add(other);
+      first.set(other, at === from ? l : first.get(at)!);
+      if (other === to) return first.get(other)!;
+      queue.push(other);
+    }
+  }
+  return null;
+}
+
+/** A flight as the game keeps it (maze.ts's Stair, the part this needs). */
+export type FlightGeom = { x: number; y: number; spanX: boolean; run: number; fromFloorY: number; toFloorY: number };
+
+/**
+ * Where to walk to use a flight, in world metres: `foot` is the middle of the cell before its first step (the end at `fromFloorY`), `head` the middle of the cell past its last (the
+ * end at `toFloorY`). Walk from one to the other, straight along the flight.
+ */
+export function flightEnds(s: FlightGeom, cell: number): { foot: Pt; head: Pt; footCell: { x: number; y: number }; headCell: { x: number; y: number } } {
+  const dx = s.spanX ? 0 : 1;
+  const dz = s.spanX ? 1 : 0;
+  const footCell = { x: s.x - dx, y: s.y - dz };
+  const headCell = { x: s.x + dx * s.run, y: s.y + dz * s.run };
+  return { foot: { x: footCell.x * cell, z: footCell.y * cell }, head: { x: headCell.x * cell, z: headCell.y * cell }, footCell, headCell };
+}
+
+/**
+ * Of the cells a walker can reach (`dist` >= 0, a floor's distance field), the one nearest (straight line) to the cell (tx, ty); null if there is none. `usable` (optional) leaves out
+ * cells that will not do (one on the other side of a wall from where the walker stands).
+ */
+export function nearestOpenCell(dist: readonly (readonly number[])[], tx: number, ty: number, usable?: (x: number, y: number) => boolean): { x: number; y: number } | null {
+  let best: { x: number; y: number } | null = null;
+  let bestD = Infinity;
+  for (let y = 0; y < dist.length; y++) {
+    const row = dist[y]!;
+    for (let x = 0; x < row.length; x++) {
+      if (row[x]! < 0 || (usable && !usable(x, y))) continue;
+      const d = Math.hypot(x - tx, y - ty);
+      if (d < bestD - 1e-9) {
+        bestD = d;
+        best = { x, y };
+      }
+    }
+  }
+  return best;
+}
+
+export const UP_HOLD_REACH = 2.2; // while you are somewhere it cannot follow, it waits this near the spot under you (or the nearest place it can get to)
+export const NO_WAY_S = 6; // on another floor with no stairs or lift to you for this long: it is put back beside you
+export const WEDGED_S = 2.4; // trying to walk on your floor and getting nowhere for this long: put back on your path
+export const WEDGED_FAR_S = 3; // the same, on another floor
+export const LOST_FAR_M = 22; // further than this from you on your floor...
+export const LOST_FAR_S = 8; // ...for this long: put back on your path
+
+/**
+ * Whether a walker that has been trying to move but has not got anywhere should be put back beside the leader: it has stood within `0.35` of the same spot for longer than the limit
+ * (shorter on the leader's floor, where the way is short, than on another). `stuckFor` is how long that has been.
+ */
+export function wedged(stuckFor: number, sameFloor: boolean): boolean {
+  return stuckFor > (sameFloor ? WEDGED_S : WEDGED_FAR_S);
+}
+
+export const NAV_FAR = 9; // further than this from you on your floor, it goes by the corridors to you (not along your path)...
+export const NAV_NEAR = 5; // ...and goes on doing so until it is nearer than this (so it does not dither between the two at the edge)
+
+/** Whether the partner goes to you by the corridors (true) or along your path (false), given how it was going and how far it now is. */
+export function byCorridors(was: boolean, reach: number): boolean {
+  return was ? reach > NAV_NEAR : reach > NAV_FAR;
 }

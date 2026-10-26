@@ -162,7 +162,7 @@ import {
   type TrainingProgress,
 } from './game/tutorial';
 import { clueOn, space as bunkerSpace, openContainers, type BunkerContainer, BUNKER_EXIT, BUNKER_EXIT_LEVEL, BUNKER_LEVELS, BUNKER_LEVEL_NAMES, BUNKER_SHAFTS, BUNKER_STAIRS, BUNKER_START, BUNKER_STATIONS, BUNKER_WALL_H, DUCT_H, DUCT_LANE, alphasOn, bunkerMap, bunkerPieces, camerasOn, dogsOn, ductCellSolids, ductsOn, roofNav, roofRoutes, gatesOn, linesOn, packOn, patrolsOn, postsOn, slidersOn, stairCells, stairEnds, sweepersOn, type Rect, type Shaft } from './game/bunkerplan';
-import { buildStairMesh } from './game/stairs';
+import { buildStairMesh, openFlightEnd, stairGroundHeight } from './game/stairs';
 import type { Box3 } from './game/wallfade';
 import { buildYard, type BuiltYard } from './game/yard';
 import { PropFader } from './game/propfade';
@@ -241,7 +241,8 @@ import { threatLevel, heartPace, easeBpm, CALM_BPM } from './game/heart';
 import { musicMix } from './game/music';
 import { hopSpot, type Threat as HopThreat } from './game/coverhop';
 import { coverSpotNear, cornerSpotNear, clampToCover, coverFacing, CORNER_AIM_YAW, type CoverSpot } from './game/cover';
-import { Trail, followInput, followTarget, holdProgress, seenFor, sightOf, together, RESCUE_REACH, REVIVE_S, DOWN_FAIL_S, LEAVE_DOWNED_S, mayLeaveWithout, SEEN_DOWN_S, BACKUP_COOLDOWN_S, BACKUP_RANGE, LOOKOUT_RANGE, AUTO_COOLDOWN_S, shouldEngage, goInput, turnToward, threatBearings, coverScore, type Bearing, type PartnerState } from './game/companion';
+import { Avoider, blockedAt } from './game/avoid';
+import { Trail, followInput, followTarget, holdProgress, CATCH_UP, seenFor, sightOf, together, RESCUE_REACH, REVIVE_S, DOWN_FAIL_S, LEAVE_DOWNED_S, mayLeaveWithout, SEEN_DOWN_S, BACKUP_COOLDOWN_S, BACKUP_RANGE, LOOKOUT_RANGE, AUTO_COOLDOWN_S, shouldEngage, goInput, turnToward, headingTo, threatBearings, coverScore, nextLink, flightEnds, nearestOpenCell, wedged, byCorridors, NAV_FAR, NO_WAY_S, UP_HOLD_REACH, LOST_FAR_M, LOST_FAR_S, type Bearing, type FloorLink, type PartnerState } from './game/companion';
 import { placeStaffLockers, placeVents, type StaffLockerSpot } from './game/props';
 import { updateScreens } from './game/screens';
 import { buildStaffLocker, buildVentGrille, type StaffLockerRig, type VentRig } from './game/stealthprops';
@@ -2717,7 +2718,8 @@ function startJob(n: number, course: Course | null = null, dailyRun: DailyRun | 
   // An option on the brief (and `?coop=ai` on localhost): the agent's other half, Agent A if you are Agent B and the reverse, comes out of the lift with you. It follows your path, copies how you move
   // (sneaking, lying flat, dashing), takes cover when you do, backs your shots up and shoots guards that come at either of you, and watches your back while you work a console. A guard that gets
   // a good look at it puts it down (not dead): hold Interact beside it to bring it round, or it is lost after a while and the job goes on without it. The exit lift takes the two of you together.
-  const partnerOn = aiCoopOn && !training && !dailyRun?.scored; // (a scored Daily is the same for everyone: no partner there)
+  // The tower, the bunker and the exit level are levels of their own here, not lessons, so the partner comes along on them too.
+  const partnerOn = aiCoopOn && (!training || tower || bunker) && !dailyRun?.scored; // (a scored Daily is the same for everyone: no partner there)
   const partnerName = agent === 'male' ? 'Agent B' : 'Agent A';
   let partner: Player | null = null;
   let partnerState: PartnerState = 'free';
@@ -2744,6 +2746,12 @@ function startJob(n: number, course: Course | null = null, dailyRun: DailyRun | 
   const partnerStuck = { x: 0, z: 0, t: 0 };
   /** How long it has been a long way from you on your floor (past a while, however it got there, it is put back on your path). */
   let partnerFarFor = 0;
+  /** How long it has been on another floor from you with no stairs or lift that lead to yours. */
+  let partnerNoWayFor = 0;
+  /** How long it has stood about, not walking, a long way from you on your floor. */
+  let partnerIdleFar = 0;
+  /** How much longer to count it as trying to walk (a moment after the last frame it was). */
+  let partnerTryLeft = 0;
   if (partnerOn) {
     partner = new Player(root.scene, 0, 0, agent === 'male' ? 'female' : 'male', look, style);
     partner.setTorch(false);
@@ -2754,10 +2762,17 @@ function startJob(n: number, course: Course | null = null, dailyRun: DailyRun | 
 
   if (!partnerOn) hud.setPartner(null);
 
-  /** The floor the partner is on (it climbs the stair on its own). */
+  /** The storey the way out stands on (the lift in the tower's lobby, or the bunker's ground floor). */
+  const exitFloorIdx = bunker ? BUNKER_EXIT_LEVEL : 0;
+
+  /** The floor the partner is on (it climbs the stair on its own). The tower's flights have their side rails on both storeys they join, so there the storey follows its height, as yours does. */
   function partnerFloor(): ActiveFloor {
-    return storeys[partner ? Math.min(partner.currentFloorIdx, storeys.length - 1) : 0]!;
+    const idx = partner ? (tower ? Math.round(partner.worldY / floorHeight) : partner.currentFloorIdx) : 0;
+    return storeys[Math.max(0, Math.min(idx, storeys.length - 1))]!;
   }
+
+  /** You are somewhere it cannot walk to (hanging on a ledge, up a wall, on a container's roof, on the pipes): it waits at the nearest place it can get to instead of trying the walls. */
+  const leaderUp = (): boolean => aloft !== null || roofY !== null;
 
   /** The walls the partner sees through: all of its floor's, bar the furniture it is crouched behind (it shoots over that). */
   function partnerWalls(): WallBox[] {
@@ -2882,7 +2897,7 @@ function startJob(n: number, course: Course | null = null, dailyRun: DailyRun | 
     partner.setProne(true);
     sound.play('hurt');
     hud.showToast(`${partnerName.toUpperCase()} IS DOWN · GET TO THEM AND HOLD INTERACT`, 'bad', 3400);
-    suspicion = applySuspicion(suspicion, 15);
+    suspicion = applySuspicion(suspicion, healthMode ? 5 : 15); // (a bar of health in the exit level and the bunker: not a fifth of it for a partner who is put down)
     hud.setSuspicion(suspicion);
   }
 
@@ -2919,49 +2934,170 @@ function startJob(n: number, course: Course | null = null, dailyRun: DailyRun | 
   /** The opening it is heading for, kept for a moment: re-picking every frame from its rounded cell made it dither between two goals at a cell boundary while it turned. */
   let navLock: { x: number; z: number; key: string; until: number } | null = null;
 
+  let partnerByCorridors = false; // (going to you by the corridors, not along your path: kept until it is near, so it does not dither at the edge)
+
+  /** Steering round what stands in a corridor (a desk, a pair of crates): the corridors know the walls, not the furniture, so a straight line to the next opening walks into it. */
+  const partnerAvoid = new Avoider();
+  /** The point to steer for on the way to (x, z): the target itself when the way is clear, else a step turned aside round the box in the way. */
+  function partnerAim(me: { x: number; z: number }, target: { x: number; z: number }, walls: WallBox[], stance: { sneak: boolean; prone: boolean }, dt: number): { x: number; z: number } {
+    const near = walls.filter((b) => b.maxX > me.x - 3 && b.minX < me.x + 3 && b.maxZ > me.z - 3 && b.minZ < me.z + 3 && !(stance.prone && b.under) && !(stance.sneak && b.duct));
+    // (Brushing against a box already, which the steering would take for being inside it and go straight on into: it works out the way round with a slimmer body.)
+    const r = PLAYER_R + 0.04;
+    const step = partnerAvoid.step(me.x, me.z, target.x, target.z, 1.1, blockedAt(me.x, me.z, r, near) ? 0.2 : r, near, dt);
+    return Math.hypot(step.x - me.x, step.z - me.z) < 1e-6 ? target : step;
+  }
+
+  /** The flight it has started to cross (and from which floor), for a moment. */
+  let partnerCross: { stair: Stair; floor: number; until: number } | null = null;
+
+  /** A way between two floors the partner can use: a flight (walked) or a lift (ridden, where you would). */
+  type PartnerWay = FloorLink & { stair?: Stair; lift?: { from: { level: number; rig: ElevatorRig }; to: { level: number; rig: ElevatorRig } } };
+
+  /** Every stair and lift between floors the partner can take now: the flights that are open, the lifts that are not locked (a lift takes it one storey, as it takes you). */
+  function partnerWays(): PartnerWay[] {
+    const ways: PartnerWay[] = [];
+    for (const st of stairs) {
+      if (st.fromFloorY === st.toFloorY || ((st as { id?: string }).id === 'core' && !coreOpen)) continue; // (a container's roof is no way between floors)
+      const a = Math.round(st.fromFloorY / floorHeight);
+      const b = Math.round(st.toFloorY / floorHeight);
+      // (The bunker's flights go both ways: the wall at the foot of the flight, on the storey above, is open to whoever comes down it.)
+      if (a !== b) ways.push(bunker ? { a: Math.min(a, b), b: Math.max(a, b), kind: 'stair', ref: 0, stair: st } : { a, b, kind: 'stair', ref: 0, stair: st });
+    }
+    for (const l of towerLifts) {
+      const def = TOWER_LIFTS.find((t) => t.id === l.id);
+      if (!def || (def.locked && !hasKey)) continue;
+      const next = def.serves[def.serves.indexOf(l.level) + 1];
+      const to = next === undefined ? undefined : towerLifts.find((t) => t.id === l.id && t.level === next);
+      if (to) ways.push({ a: l.level, b: to.level, kind: 'lift', ref: 0, lift: { from: l, to } });
+    }
+    return ways;
+  }
+
+  /** What the partner is doing to get to another floor: where it heads now, and the lift to ride when it has got to the doors. */
+  type PartnerGoal = { x: number; z: number; waypoint?: boolean; ride?: PartnerWay };
+
   /**
    * Where the partner heads when the straight way to its spot is shut (a wall between, you came by the pipes or a vent, you are on another floor): the middle of the next corridor cell
-   * on the way to you, by the floor's own passages (doors that are locked count as walls); the stair when you are on the other floor. Null when there is no way (then it walks straight).
+   * on the way to you, by the floor's own passages (doors that are locked count as walls). On another floor: by the stairs and lifts (partnerWays) that lead to yours, to the foot of the flight
+   * and straight up it, or to the lift's doors to ride it. Null when there is no way (then it walks straight, or waits).
    */
-  function partnerNavGoal(floor: ActiveFloor, sameFloor: boolean): { x: number; z: number; waypoint?: boolean } | null {
+  function partnerNavGoal(floor: ActiveFloor, sameFloor: boolean): PartnerGoal | null {
     if (!partner) return null;
     const { navCells, cols, rows } = floor.content;
-    let goal: { x: number; z: number; cx: number; cy: number };
+    const o = floor.rig.group.position;
+    const fi = partner.currentFloorIdx;
+    // In a lift's cab (after a ride): out through its doors, along the line from the middle of the cab to them, not at a slant across the door jamb.
+    for (const l of towerLifts) {
+      if (l.level !== fi || !l.rig.contains(partner.worldX - o.x, partner.worldZ - o.z)) continue;
+      const mid = { x: l.rig.spawn.x + o.x, z: l.rig.spawn.z + o.z };
+      const door = { x: l.rig.front.x + o.x, z: l.rig.front.z + o.z };
+      const len = Math.hypot(door.x - mid.x, door.z - mid.z) || 1;
+      const off = Math.abs((door.x - mid.x) * (partner.worldZ - mid.z) - (door.z - mid.z) * (partner.worldX - mid.x)) / len; // how far it is from that line
+      return off > 0.35 ? { x: mid.x, z: mid.z, waypoint: true } : { x: door.x, z: door.z, waypoint: true };
+    }
+    let goal: { x: number; z: number };
     if (sameFloor) {
-      goal = { x: player.worldX, z: player.worldZ, cx: Math.round(player.worldX / CELL), cy: Math.round(player.worldZ / CELL) };
-    } else if (stair) {
-      // Another floor: by the stair. Up from the ground floor: to its foot, then straight up it to the landing; down from the one above: to the landing, then straight down it to the foot.
-      // (Its run is not part of the corridors on either floor, so only the two ends are reached by them.)
-      const dx = stair.spanX ? 0 : 1;
-      const dz = stair.spanX ? 1 : 0;
-      const up = partner.currentFloorIdx === 0;
-      // The two ends: the corridor cell before its first step (the foot), and the landing past the last (the middle of each cell).
-      const foot = { x: (stair.x - dx) * CELL, z: (stair.y - dz) * CELL };
-      const landing = { x: (stair.x + dx * stair.run) * CELL, z: (stair.y + dz * stair.run) * CELL };
-      const along = dz ? partner.worldZ : partner.worldX;
-      const across = dz ? partner.worldX - stair.x * CELL : partner.worldZ - stair.y * CELL;
-      const origin = (dz ? stair.y : stair.x) * CELL;
-      const onStair = Math.abs(across) < CELL / 2 + 0.3 && along > origin - CELL / 2 - 0.3 && along < origin + stair.run * CELL - CELL / 2 + 0.3;
-      const end = up ? landing : foot;
-      const start = up ? foot : landing;
-      // On the stair, or standing at its near end: straight across it.
-      if (onStair || Math.hypot(partner.worldX - start.x, partner.worldZ - start.z) < 1.4) return end;
-      goal = { x: start.x, z: start.z, cx: Math.round(start.x / CELL), cy: Math.round(start.z / CELL) };
-    } else return null;
-    const key = `${partner.currentFloorIdx}:${goal.cx},${goal.cy}`;
-    if (navLock && navLock.key === key && stats.seconds < navLock.until && Math.hypot(partner.worldX - navLock.x, partner.worldZ - navLock.z) > 0.5) return { x: navLock.x, z: navLock.z, waypoint: true };
+      goal = { x: player.worldX, z: player.worldZ };
+    } else {
+      const all = partnerWays();
+      let way = nextLink(all, fi, activeFloorIdx);
+      if (!way) return null;
+      // Two ways between the same pair of floors (a flight at each end of the hall, a flight and a lift): the one whose entrance is nearest to it.
+      const first = way;
+      const twins = all.filter((w) => (w.a === first.a && w.b === first.b) || (w.a === first.b && w.b === first.a));
+      if (twins.length > 1) {
+        const entrance = (w: PartnerWay): { x: number; z: number } => {
+          if (w.stair) {
+            const e = flightEnds(w.stair, CELL);
+            return Math.round(w.stair.fromFloorY / floorHeight) === fi ? e.foot : e.head;
+          }
+          const rec = w.lift!.from.level === fi ? w.lift!.from : w.lift!.to;
+          return { x: rec.rig.front.x + o.x, z: rec.rig.front.z + o.z };
+        };
+        let bestD = Infinity;
+        for (const w of twins) {
+          // (One it is already on, or has set off along, is the one it takes.)
+          if (w.stair && (stairGroundHeight(w.stair, partner.worldX, partner.worldZ, CELL) !== null || (partnerCross && partnerCross.stair === w.stair && partnerCross.floor === fi && stats.seconds < partnerCross.until))) {
+            way = w;
+            break;
+          }
+          const e = entrance(w);
+          const d = Math.hypot(e.x - partner.worldX, e.z - partner.worldZ);
+          if (d < bestD) {
+            bestD = d;
+            way = w;
+          }
+        }
+      }
+      if (way.stair) {
+        // Up (or down) a flight: to the cell before its first step, then straight along it to the cell past the last. (Its run is not part of the corridors on either floor, so only the two ends are reached by them.)
+        const e = flightEnds(way.stair, CELL);
+        const fromHere = Math.round(way.stair.fromFloorY / floorHeight) === fi;
+        const end = fromHere ? e.head : e.foot;
+        const start = fromHere ? e.foot : e.head;
+        // (Once it has set off along the flight it keeps going for a few seconds, however near or far the foot is measured from: it does not turn back at the first step.)
+        if (partnerCross && partnerCross.floor === fi && partnerCross.stair === way.stair && stats.seconds < partnerCross.until) return { x: end.x, z: end.z };
+        if (stairGroundHeight(way.stair, partner.worldX, partner.worldZ, CELL) !== null || Math.hypot(partner.worldX - start.x, partner.worldZ - start.z) < 1.4) {
+          partnerCross = { stair: way.stair, floor: fi, until: stats.seconds + 3.5 };
+          return { x: end.x, z: end.z };
+        }
+        goal = start;
+      } else {
+        const lift = way.lift!;
+        const here = lift.from.level === fi ? lift.from : lift.to;
+        const doors = { x: here.rig.front.x + o.x, z: here.rig.front.z + o.z };
+        if (here.rig.contains(partner.worldX - o.x, partner.worldZ - o.z) || Math.hypot(partner.worldX - doors.x, partner.worldZ - doors.z) < 1.2) return { x: doors.x, z: doors.z, ride: way };
+        goal = doors;
+      }
+    }
+    // (The cell a point is in, or when that one has no way out of it, as a lift's cab has not, the nearest of its neighbours that has.)
+    let gcx = Math.round((goal.x - o.x) / CELL);
+    let gcy = Math.round((goal.z - o.z) / CELL);
+    const opens = (cx: number, cy: number): boolean => {
+      const c = navCells[cy]?.[cx];
+      return !!c && (c.N || c.S || c.E || c.W);
+    };
+    if (!opens(gcx, gcy)) {
+      let bestD = Infinity;
+      let pick: readonly [number, number] | null = null;
+      for (const [dx, dy] of [[0, -1], [0, 1], [1, 0], [-1, 0]] as const) {
+        const d = Math.hypot(o.x + (gcx + dx) * CELL - goal.x, o.z + (gcy + dy) * CELL - goal.z);
+        if (opens(gcx + dx, gcy + dy) && d < bestD) {
+          bestD = d;
+          pick = [dx, dy];
+        }
+      }
+      if (pick) {
+        gcx += pick[0];
+        gcy += pick[1];
+      } else if (sameFloor) {
+        // You are somewhere no corridor leads (a duct, the middle of a stairwell): it waits at the nearest place it can reach.
+        return partnerWaitGoal(floor);
+      }
+    }
+    const key = `${fi}:${gcx},${gcy}`;
     let dist = partnerNav.get(key);
     if (!dist) {
       if (partnerNav.size > 24) partnerNav.clear();
-      dist = bfs(navCells, cols, rows, goal.cx, goal.cy);
+      dist = bfs(navCells, cols, rows, gcx, gcy);
       partnerNav.set(key, dist);
     }
-    const mx = Math.max(0, Math.min(cols - 1, Math.round(partner.worldX / CELL)));
-    const my = Math.max(0, Math.min(rows - 1, Math.round(partner.worldZ / CELL)));
+    const mx = Math.max(0, Math.min(cols - 1, Math.round((partner.worldX - o.x) / CELL)));
+    const my = Math.max(0, Math.min(rows - 1, Math.round((partner.worldZ - o.z) / CELL)));
     const here = dist[my]?.[mx] ?? -1;
-    if (here < 0) return null;
+    if (here === 0) navLock = null; // (in the goal's own cell: nothing left to hold on to)
+    else if (navLock && navLock.key === key && stats.seconds < navLock.until && Math.hypot(partner.worldX - navLock.x, partner.worldZ - navLock.z) > 0.5) return { x: navLock.x, z: navLock.z, waypoint: true };
+    // On a floor of its own, shut off from where you are by the corridors (you went by a duct, or a shaft): it waits at the nearest place to you that it can reach.
+    if (here < 0 && sameFloor && opens(mx, my)) return partnerWaitGoal(floor);
+    if (here < 0) {
+      // Standing where no corridor goes (a lift's cab, a flight's last step, a cell the plan shut): to the nearest cell that does lead to the goal.
+      // (One it can see: a cell the other side of a wall would be a walk into the wall.)
+      const seen = (x: number, y: number): boolean => clearWalk(partner!.worldX, partner!.worldZ, o.x + x * CELL, o.z + y * CELL, floor.rig.wallBoxes);
+      const near = nearestOpenCell(dist, mx, my, seen) ?? nearestOpenCell(dist, mx, my);
+      return near && (near.x !== mx || near.y !== my) ? { x: o.x + near.x * CELL, z: o.z + near.y * CELL, waypoint: true } : null;
+    }
     if (here === 0) return { x: goal.x, z: goal.z };
-    let best: { x: number; z: number; waypoint?: boolean } | null = null;
+    let best: PartnerGoal | null = null;
     let bestD = here;
     for (const [d, dx, dy] of [['N', 0, -1], ['S', 0, 1], ['E', 1, 0], ['W', -1, 0]] as const) {
       if (!navCells[my]?.[mx]?.[d]) continue;
@@ -2970,11 +3106,84 @@ function startJob(n: number, course: Course | null = null, dailyRun: DailyRun | 
         bestD = nd;
         // The middle of the opening into that cell, not the middle of the cell itself: a straight line from anywhere in this cell to the opening stays inside it (no wall corner to catch on),
         // and it goes on pointing the same way as the partner crosses, so it cannot dither between two goals at a cell boundary.
-        best = { x: (mx + dx / 2) * CELL, z: (my + dy / 2) * CELL, waypoint: true };
+        best = { x: o.x + (mx + dx / 2) * CELL + dx * 0.4, z: o.z + (my + dy / 2) * CELL + dy * 0.4, waypoint: true }; // (a step past the opening, so it is across it, not stopped on the line where the cell it is in changes)
         navLock = { x: best.x, z: best.z, key, until: stats.seconds + 3 };
       }
     }
     return best;
+  }
+
+  /** Whether a body can walk straight from (ax, az) to (bx, bz): nothing across the way, at its own width (a line that just clears a wall's corner is no way through). */
+  function clearWalk(ax: number, az: number, bx: number, bz: number, walls: WallBox[]): boolean {
+    const d = Math.hypot(bx - ax, bz - az);
+    for (let k = 1; k <= Math.ceil(d / 0.4); k++) {
+      const t = (k * 0.4) / d;
+      if (t < 1 && collides(ax + (bx - ax) * t, az + (bz - az) * t, walls)) return false;
+    }
+    return !collides(bx, bz, walls);
+  }
+
+  /** The cell the partner waits in while you are up where it cannot follow (kept for a moment): the one on its floor that it can reach, nearest to you. */
+  const partnerWait = { x: 0, z: 0, until: -1, floor: -1 };
+  function partnerWaitGoal(floor: ActiveFloor): { x: number; z: number } | null {
+    if (!partner) return null;
+    if (stats.seconds < partnerWait.until && partnerWait.floor === partner.currentFloorIdx) return partnerWait;
+    const o = floor.rig.group.position;
+    const { navCells, cols, rows } = floor.content;
+    const dist = bfs(navCells, cols, rows, Math.round((partner.worldX - o.x) / CELL), Math.round((partner.worldZ - o.z) / CELL));
+    const lx = Math.round((player.worldX - o.x) / CELL);
+    const ly = Math.round((player.worldZ - o.z) / CELL);
+    const cell = nearestOpenCell(dist, lx, ly);
+    if (!cell) return null;
+    // (Two cells as near as each other: it stays at the one it was at, rather than going back and forth.)
+    const kx = Math.round((partnerWait.x - o.x) / CELL);
+    const ky = Math.round((partnerWait.z - o.z) / CELL);
+    const keep = partnerWait.floor === partner.currentFloorIdx && (dist[ky]?.[kx] ?? -1) >= 0 && Math.hypot(kx - lx, ky - ly) <= Math.hypot(cell.x - lx, cell.y - ly) + 1;
+    if (!keep) Object.assign(partnerWait, { x: o.x + cell.x * CELL, z: o.z + cell.y * CELL, floor: partner.currentFloorIdx });
+    partnerWait.until = stats.seconds + 0.8;
+    return partnerWait;
+  }
+
+  /** A free spot on the partner's floor to be put at, near (x, z): the middle of the nearest cell that has a way out and nothing standing in it. */
+  function partnerFreeSpot(floor: ActiveFloor, x: number, z: number): { x: number; z: number } {
+    const o = floor.rig.group.position;
+    const { navCells, cols, rows } = floor.content;
+    let best = { x, z };
+    let bestD = Infinity;
+    for (let cy = 0; cy < rows; cy++) {
+      for (let cx = 0; cx < cols; cx++) {
+        const c = navCells[cy]![cx]!;
+        if (!(c.N || c.S || c.E || c.W)) continue;
+        const px = o.x + cx * CELL;
+        const pz = o.z + cy * CELL;
+        const d = Math.hypot(px - x, pz - z);
+        if (d < bestD && !collides(px, pz, floor.rig.wallBoxes)) {
+          bestD = d;
+          best = { x: px, z: pz };
+        }
+      }
+    }
+    return best;
+  }
+
+  /** Where to put the partner back on your floor: on your path, a few metres behind you; not where that is inside a wall (you came over it) or you are up where it cannot stand. */
+  function partnerBackSpot(floor: ActiveFloor, here: { x: number; z: number }): { x: number; z: number } {
+    const back = partnerTrail.pointBehind(here, 3.4);
+    if (!leaderUp() && !collides(back.x, back.z, floor.rig.wallBoxes)) return back;
+    return partnerFreeSpot(floor, here.x, here.z);
+  }
+
+  /** Whether (x, z) is within `cells` cells of one of the bunker's ducts on storey `level` (a lane through the cells of a duct, crouched or flat). */
+  const inDuct = (x: number, z: number, level: number, cells: number): boolean => ductsOn(level).some((d) => d.cells.some((c) => Math.hypot(x - c.x * CELL, z - c.y * CELL) < CELL * cells));
+
+  /** The partner rides a lift where you would: out in a flash at its doors, in again in the cab of the next storey it serves. */
+  function partnerRideLift(way: PartnerWay): void {
+    if (!partner || !way.lift || partnerBlink) return; // (already on its way: the blink takes a moment)
+    const to = partner.currentFloorIdx === way.lift.from.level ? way.lift.to : way.lift.from;
+    const at = to.rig.spawn;
+    const o = storeys[to.level]!.rig.group.position;
+    sound.play('liftDoors', { x: o.x + to.rig.front.x, y: to.level * floorHeight + 1.2, z: o.z + to.rig.front.z }, 0.5);
+    regroupPartner(o.x + at.x, o.z + at.z, at.facing, to.level * floorHeight);
   }
 
   /** One frame of the partner, from inside the main loop (it needs this frame's posture and the stair). */
@@ -2990,7 +3199,7 @@ function startJob(n: number, course: Course | null = null, dailyRun: DailyRun | 
     partnerBlink = { left: BLINK_S, to: { x, z, f, y } };
   }
 
-  function updatePartner(dt: number, stance: { sneak: boolean; prone: boolean; dash: boolean }, stairs: Stair[]): void {
+  function updatePartner(dt: number, stance: { sneak: boolean; prone: boolean; dash: boolean }): void {
     if (!partner) return;
     if (partnerBlink) {
       partnerBlink.left -= dt;
@@ -3003,7 +3212,7 @@ function startJob(n: number, course: Course | null = null, dailyRun: DailyRun | 
       blasts.phase(new THREE.Vector3(partner.worldX, partner.worldY, partner.worldZ));
     }
     // Shut in the arrival cab (the doors closed with it still inside): out in front of the doors.
-    if (arrivalPhase === 'done' && arrival.contains(partner.worldX, partner.worldZ)) {
+    if (arrivalPhase === 'done' && partner.currentFloorIdx === 0 && partner.worldY < 1 && arrival.contains(partner.worldX, partner.worldZ)) {
       partner.place(arrival.front.x, arrival.front.z, arrival.spawn.facing, 0);
       partnerTrail.clear();
     }
@@ -3011,6 +3220,8 @@ function startJob(n: number, course: Course | null = null, dailyRun: DailyRun | 
     const walls = floor.rig.wallBoxes;
     const lasers = floor.content.laserBoxes;
     const sameFloor = partner.currentFloorIdx === activeFloorIdx;
+    const stairsNow = stairsAt(partner.worldY); // (the flights it can be on at its height: the tower's are stacked in one footprint)
+    const up = leaderUp();
     const blockers: Blocker[] = floor.content.enemies.filter((b) => !b.disabled && b.radius > 0).map((b) => ({ x: b.worldX, z: b.worldZ, r: b.radius }));
     partnerCooldown = Math.max(0, partnerCooldown - dt);
     partnerTrying = false;
@@ -3024,8 +3235,8 @@ function startJob(n: number, course: Course | null = null, dailyRun: DailyRun | 
     partnerTrail.push(here.x, here.z);
     if (partnerState === 'down') {
       // Waiting in the open exit for a partner who is down: after a few seconds the lift takes the agent without them (exitReady).
-      partnerLiftWait = exitLift.contains(here.x, here.z) ? partnerLiftWait + dt : 0;
-      partner.tick({ ...idle, prone: true }, dt, walls, [], [], stairs);
+      partnerLiftWait = player.currentFloorIdx === exitFloorIdx && exitLift.contains(here.x, here.z) ? partnerLiftWait + dt : 0;
+      partner.tick({ ...idle, prone: true }, dt, walls, [], [], stairsNow);
       partner.stepLie(dt);
       partnerDownFor += dt;
       if (partnerWorking) {
@@ -3039,12 +3250,12 @@ function startJob(n: number, course: Course | null = null, dailyRun: DailyRun | 
       }
     } else if (arrivalPhase === 'waiting') {
       // Still in the lift, the doors shut: standing about.
-      partner.tick(idle, dt, walls, [], [], stairs);
+      partner.tick(idle, dt, walls, [], [], stairsNow);
     } else {
       const leader = { x: here.x, z: here.z, angle: player.facingAngle, sneak: stance.sneak, prone: stance.prone, dash: stance.dash, moving: player.moving };
       const me = { x: partner.worldX, z: partner.worldZ, angle: partner.facingAngle };
       const blockersNow = sameFloor ? [{ x: here.x, z: here.z, r: PLAYER_R }, ...blockers] : blockers;
-      const inExit = exitLift.contains(here.x, here.z);
+      const inExit = player.currentFloorIdx === exitFloorIdx && exitLift.contains(here.x, here.z);
       partnerLiftWait = inExit ? partnerLiftWait + dt : 0;
       // You are in cover: it finds furniture of its own near you and takes cover there, and holds it until you leave yours.
       if (!inCover || inExit || !sameFloor) {
@@ -3074,17 +3285,17 @@ function startJob(n: number, course: Course | null = null, dailyRun: DailyRun | 
         input = goInput(me, arrival.front, { sneak: false, prone: false }, 0.4, false);
       } else if (inExit) {
         // You are in the exit: it comes in after you, as far as the cab lets it (by the corridors if a wall is in the way, and straight in at the doors).
-        const inCab = exitLift.contains(me.x, me.z);
+        const inCab = partner.currentFloorIdx === exitFloorIdx && exitLift.contains(me.x, me.z);
         const toFront = Math.hypot(me.x - exitLift.front.x, me.z - exitLift.front.z);
         const aim = inCab || toFront < 1.2 ? here : exitLift.front;
         const blocked = !sameFloor || !hasLineOfSight(me.x, me.z, aim.x, aim.z, walls, 40);
         const nav = blocked ? partnerNavGoal(floor, sameFloor) : null;
-        const step = goInput(me, nav ?? aim, { sneak: false, prone: false }, nav?.waypoint ? 0.02 : 0.9, true);
+        const step = goInput(me, nav ?? aim, { sneak: false, prone: false }, nav?.waypoint ? 0.25 : 0.9, true);
         input = inCab || step.arrived ? { turn: turnToward(me.angle, leader.angle), throttle: 0, sneak: false, prone: false, dash: false } : step;
         // Stuck outside for long enough (a door, a corner, the other floor): it is brought to the cab, beside you.
         if (!inCab && partnerLiftWait > 5) {
           const f = exitLift.spawn.facing;
-          regroupPartner(exitLift.spawn.x - Math.sin(f) * 0.9, exitLift.spawn.z - Math.cos(f) * 0.9, f, partner.currentFloorIdx === 0 ? 0 : partner.worldY);
+          regroupPartner(exitLift.spawn.x - Math.sin(f) * 0.9, exitLift.spawn.z - Math.cos(f) * 0.9, f, exitFloorIdx * floorHeight);
         }
       } else if (partnerCover) {
         const spot = partnerCover;
@@ -3107,17 +3318,39 @@ function startJob(n: number, course: Course | null = null, dailyRun: DailyRun | 
         inCoverNow = partnerCoverReady;
       } else {
         // Along your path; but where the straight way to its spot is shut (a wall, another floor), by the corridors.
+        // (You up where it cannot walk: it waits at the nearest place it can reach, and looks your way.)
         const spot = followTarget(me, leader, partnerTrail);
-        const blocked = !sameFloor || !hasLineOfSight(me.x, me.z, spot.x, spot.z, walls, 40);
-        const goal = blocked ? partnerNavGoal(floor, sameFloor) : null;
-        if (goal) {
+        // (Well behind it goes by the corridors, the shortest way: your own path may have gone the long way round, to a door and back.)
+        partnerByCorridors = sameFloor && byCorridors(partnerByCorridors, reach);
+        // (A duct is no corridor of the plan: where you crawl in, it crouches and comes after you along your path, and out again.)
+        const ductWay = bunker && sameFloor && !up && (inDuct(here.x, here.z, activeFloorIdx, 0.75) || inDuct(me.x, me.z, partner.currentFloorIdx, 0.75)) && inDuct(me.x, me.z, partner.currentFloorIdx, 2.2);
+        const blocked = !ductWay && (!sameFloor || up || partnerByCorridors || !hasLineOfSight(me.x, me.z, spot.x, spot.z, walls, 40));
+        const goal: PartnerGoal | null = up && sameFloor ? partnerWaitGoal(floor) : blocked ? partnerNavGoal(floor, sameFloor) : null;
+        if (goal?.ride) {
+          // At a lift's doors on the way to your floor: it rides.
+          input = { turn: 0, throttle: 0, sneak: false, prone: false, dash: false };
+          partnerRideLift(goal.ride);
+        } else if (goal) {
           // (A waypoint at the opening into the next cell is never 'arrived at': it is walked through, and the next one takes over as the partner crosses.)
-          const step = goInput(me, goal, { sneak: stance.sneak, prone: false }, goal.waypoint ? 0.02 : 0.5, true);
-          input = { ...step, dash: reach > 8 };
-        } else input = followInput(me, leader, partnerTrail);
+          // (Far behind a sneaking leader it runs to catch up; near, it creeps as they do.)
+          const gait = { sneak: stance.sneak && (reach < CATCH_UP || stance.prone), prone: false };
+          const stepGoal = goInput(me, goal, gait, goal.waypoint ? 0.25 : up ? UP_HOLD_REACH * 0.3 : 0.5, true);
+          // (It steers for a point aside when something stands in the way, but is there when it is at the goal.)
+          const step = stepGoal.arrived ? stepGoal : goInput(me, partnerAim(me, goal, walls, gait, dt), gait, 0.25, true);
+          input = up && step.arrived ? { turn: turnToward(me.angle, headingTo(me, here)), throttle: 0, sneak: false, prone: false, dash: false } : { ...step, dash: stepGoal.dash && reach > CATCH_UP && !stance.prone && !up }; // (it runs only along a straight stretch: at full tilt it overshoots a waypoint and has to turn round to it)
+        } else if (!sameFloor) {
+          // No stairs or lift to you (you went up by a climb, a shaft or a drop): it stays put; after a while it is put beside you.
+          input = { turn: 0, throttle: 0, sneak: false, prone: false, dash: false };
+          partnerNoWayFor += dt;
+        } else {
+          input = followInput(me, ductWay ? { ...leader, sneak: true, prone: false } : leader, partnerTrail); // (crouched in a duct: a lane it fits at a creep, not the crawl, which would have it a long way behind)
+          if (input.throttle > 0) input = { ...input, turn: turnToward(me.angle, headingTo(me, partnerAim(me, spot, walls, input, dt))) };
+        }
+        if (sameFloor || goal) partnerNoWayFor = 0;
       }
       partnerTrying = input.throttle > 0.2;
-      partner.tick({ ...idle, turn: input.turn, throttle: input.throttle, sneak: input.sneak && !input.prone, prone: input.prone, dash: input.dash && !input.sneak, cover: inCoverNow, camo: partnerCamo }, dt, walls, blockersNow, lasers, stairs);
+      partnerTryLeft = partnerTrying ? 0.6 : Math.max(0, partnerTryLeft - dt); // (a throttle that flickers about the threshold is still trying)
+      partner.tick({ ...idle, turn: input.turn, throttle: input.throttle, sneak: input.sneak && !input.prone, prone: input.prone, dash: input.dash && !input.sneak, cover: inCoverNow, camo: partnerCamo }, dt, walls, blockersNow, lasers, stairsNow);
       partner.setProne(input.prone);
       partner.stepLie(dt);
       // Watching your back while you work a console: a guard that comes up on you gets shot.
@@ -3158,31 +3391,47 @@ function startJob(n: number, course: Course | null = null, dailyRun: DailyRun | 
         }
       }
       partnerSeen = seenFor(partnerSeen, seen, dt);
-      if (partnerSeen >= SEEN_DOWN_S) partnerGoesDown();
+      // (In the exit level the hunters are all over both of you: it takes them longer to put it down, and a loud shoot-up is not made worse by it.)
+      if (partnerSeen >= (exitMode ? SEEN_DOWN_S * 2.2 : SEEN_DOWN_S)) partnerGoesDown();
     }
     // Lost for good (outside the walls, round a loop it can't close): a long way off for a long time puts it back on your path.
-    partnerFarFor = partnerState === 'free' && sameFloor && reach > 22 && !inCover ? partnerFarFor + dt : 0;
-    if (partnerFarFor > 8) {
-      const back = partnerTrail.pointBehind(here, 3.4);
+    partnerFarFor = partnerState === 'free' && sameFloor && reach > LOST_FAR_M && !inCover && !up ? partnerFarFor + dt : 0;
+    if (partnerFarFor > LOST_FAR_S) {
+      const back = partnerBackSpot(floor, here);
       regroupPartner(back.x, back.z, partner.facingAngle);
       partnerFarFor = 0;
     }
+    // On another floor with nothing that leads to yours (you climbed, drew up a shaft or dropped): beside you after a while.
+    if (sameFloor) partnerNoWayFor = 0;
+    else if (partnerState === 'free' && partnerNoWayFor > NO_WAY_S) {
+      partnerNoWayFor = 0;
+      const spot = partnerFreeSpot(storeys[activeFloorIdx]!, here.x - Math.sin(player.facingAngle) * 2.2, here.z - Math.cos(player.facingAngle) * 2.2);
+      regroupPartner(spot.x, spot.z, player.facingAngle, activeFloorIdx * floorHeight);
+    }
+    // Standing about a long way from you, not trying to walk anywhere (a goal it thinks it has reached, a wait that never ends): put back on your path.
+    partnerIdleFar = partnerState === 'free' && sameFloor && !up && partnerTryLeft <= 0 && !partnerCoverReady && !partnerWorking && reach > NAV_FAR && arrivalPhase === 'done' ? partnerIdleFar + dt : 0;
+    if (partnerIdleFar > 3) {
+      partnerIdleFar = 0;
+      const back = partnerBackSpot(floor, here);
+      regroupPartner(back.x, back.z, partner.facingAngle);
+    }
     // A partner that is trying to walk but is not getting anywhere (wedged in a doorway or on a corner, or on the wrong floor with no way down) for a while: put back with you.
     if (partnerState === 'free' && !partnerCoverReady) {
-      if (Math.hypot(partner.worldX - partnerStuck.x, partner.worldZ - partnerStuck.z) > 0.35 || !partnerTrying) {
+      if (Math.hypot(partner.worldX - partnerStuck.x, partner.worldZ - partnerStuck.z) > 0.35 || partnerTryLeft <= 0) {
         partnerStuck.x = partner.worldX;
         partnerStuck.z = partner.worldZ;
         partnerStuck.t = 0;
       } else {
         partnerStuck.t += dt;
-        if (partnerStuck.t > (sameFloor ? 2.4 : 5)) {
+        if (wedged(partnerStuck.t, sameFloor)) {
           // On your floor: back on your path behind you. On another: beside you, on your floor.
           if (sameFloor) {
-            const back = partnerTrail.pointBehind(here, 3.4);
+            const back = partnerBackSpot(floor, here);
             regroupPartner(back.x, back.z, partner.facingAngle);
           } else {
             const f = player.facingAngle;
-            regroupPartner(here.x - Math.sin(f) * 2.2, here.z - Math.cos(f) * 2.2, f, player.worldY);
+            const spot = partnerFreeSpot(storeys[activeFloorIdx]!, here.x - Math.sin(f) * 2.2, here.z - Math.cos(f) * 2.2);
+            regroupPartner(spot.x, spot.z, f, activeFloorIdx * floorHeight);
           }
           partnerStuck.x = partner.worldX;
           partnerStuck.z = partner.worldZ;
@@ -3584,17 +3833,14 @@ function startJob(n: number, course: Course | null = null, dailyRun: DailyRun | 
       for (const c of stairCells(st)) upper.floorTiles.setMatrixAt(c.y * cols + c.x, gone);
       upper.floorTiles.instanceMatrix.needsUpdate = true;
       // On the lower storey the stairwell's far end is shut by a wall, and beyond it is the grid of solid cells' walls (nothing is drawn there): the flight rises over them, and the agent has to be able to walk on at the top, so the first cell's worth stops being solid.
-      const edgeX = (st.dir === 1 ? st.x + st.run : st.x) * CELL - CELL / 2;
+      // (Walked down it is the same on the storey above: the player's floor is held to the one the flight was entered from for the whole of it, so the wall that shuts the hole's foot end stops anyone who comes down short of the landing: it stops being solid too.)
       const z0 = st.y * CELL - CELL / 2;
       const z1 = (st.y + st.width) * CELL - CELL / 2;
-      const low = storeys[st.low]!.rig.wallBoxes;
-      for (let i = low.length - 1; i >= 0; i--) {
-        const b = low[i]!;
-        const bx = (b.minX + b.maxX) / 2;
-        const bz = (b.minZ + b.maxZ) / 2;
-        const beyond = st.dir === 1 ? bx >= edgeX - 0.3 && bx <= edgeX + CELL + 0.3 : bx <= edgeX + 0.3 && bx >= edgeX - CELL - 0.3;
-        if (!b.cover && !b.under && beyond && bz > z0 + 0.5 && bz < z1 - 0.5) low.splice(i, 1);
-      }
+      const opened = (boxes: WallBox[], edgeX: number, outward: 1 | -1): void => void openFlightEnd(boxes, edgeX, outward, z0, z1, CELL);
+      const eastX = (st.x + st.run) * CELL - CELL / 2;
+      const westX = st.x * CELL - CELL / 2;
+      opened(storeys[st.low]!.rig.wallBoxes, st.dir === 1 ? eastX : westX, st.dir === 1 ? 1 : -1); // the head end, on the lower storey (climbing)
+      opened(storeys[st.high]!.rig.wallBoxes, st.dir === 1 ? westX : eastX, st.dir === 1 ? -1 : 1); // the foot end, on the storey above (coming down)
     }
     // Every floor's shaders are built now, while they are all shown once: climbing to a floor for the first time must not stall the picture compiling them.
     const shown = storeys.map((f) => f.rig.group.visible);
@@ -3629,8 +3875,18 @@ function startJob(n: number, course: Course | null = null, dailyRun: DailyRun | 
   // The hall is known from the first step (it is a lobby you walk into, not a maze): every floor's tiles are lit as explored, and the light is the warm light of a lit building,
   // not a maze's dark (the remembered tier's colour is a shared constant, put back to its own for every other job).
   // (`?dark=0` on localhost puts the tower's lights back on: by default it is dark like the heist's floors, the torch lighting the way and the floors remembered as they are walked.)
-  const towerDark = tower && new URLSearchParams(location.search).get('dark') !== '0';
-  EXPLORED_COLOR.set(tower && !towerDark ? 0x74685a : 0x20262e);
+  // The tower is dark like the heist's floors, the torch lighting the way; the exit level is lit (warm, every storey known) like the lobby you fight back through, and so is the bunker (cool
+  // strip lighting, the floors still remembered as they are walked). `?dark=1` on localhost puts the bunker's dark back; `?dark=0` lights the tower.
+  const towerDark = tower && !exitMode && new URLSearchParams(location.search).get('dark') !== '0';
+  const bunkerLit = bunker && new URLSearchParams(location.search).get('dark') !== '1';
+  EXPLORED_COLOR.set(tower && !towerDark ? 0x74685a : bunkerLit ? 0x5c6674 : 0x20262e);
+  if (bunkerLit) {
+    root.ambientLight.color.set(0xdde8f4);
+    root.ambientLight.groundColor.set(0x3b4452);
+    root.ambientLight.intensity = 0.9;
+    root.sunLight.color.set(0xdde8f4);
+    root.sunLight.intensity = 0.5;
+  }
   if (tower && !towerDark) {
     root.ambientLight.color.set(0xffe2b8);
     root.ambientLight.groundColor.set(0x4a3a28);
@@ -4937,9 +5193,9 @@ function startJob(n: number, course: Course | null = null, dailyRun: DailyRun | 
     (!partner ||
       mayLeaveWithout(partnerState, partnerLiftWait) ||
       (partnerState === 'free' &&
-        (exitLift.contains(partner.worldX, partner.worldZ) ||
-          (exitLift.contains(player.worldX, player.worldZ) && Math.hypot(partner.worldX - player.worldX, partner.worldZ - player.worldZ) <= 1.4) ||
-          (partnerLiftWait > 3 && together(partnerState, { x: player.worldX, z: player.worldZ }, { x: partner.worldX, z: partner.worldZ })))));
+        ((partner.currentFloorIdx === exitFloorIdx && exitLift.contains(partner.worldX, partner.worldZ)) ||
+          (exitLift.contains(player.worldX, player.worldZ) && partner.currentFloorIdx === player.currentFloorIdx && Math.hypot(partner.worldX - player.worldX, partner.worldZ - player.worldZ) <= 1.4) ||
+          (partnerLiftWait > 3 && partner.currentFloorIdx === player.currentFloorIdx && together(partnerState, { x: player.worldX, z: player.worldZ }, { x: partner.worldX, z: partner.worldZ })))));
 
   /** Why a contract station can't be worked yet (a step it needs), or null. */
   function stepBlockedNow(w: Workstation): string | null {
@@ -9617,6 +9873,8 @@ function startJob(n: number, course: Course | null = null, dailyRun: DailyRun | 
     towerLanding = { x: at.x, z: at.z, y: at.y, angle: at.angle };
     towerLandingLabel = 'The top floor';
     player.place(at.x, at.z, at.angle, at.y);
+    // The partner starts beside you, up here (not in the lobby's arrival lift, a long way down), a step behind and to one side.
+    partner?.place(at.x - Math.sin(at.angle) * 1.1 - Math.cos(at.angle) * 0.2, at.z - Math.cos(at.angle) * 1.1 + Math.sin(at.angle) * 0.2, at.angle, at.y);
     // No lift ride into the lobby: the agent is already up here, and the arrival lift stays shut.
     arrivalPhase = 'done';
     liftCam = 0;
@@ -10754,7 +11012,9 @@ function startJob(n: number, course: Course | null = null, dailyRun: DailyRun | 
       const here = activeFloorIdx === d.level && Math.abs(player.worldY - d.level * floorHeight) < 1.5;
       const pd = here ? Math.hypot(player.worldX - d.rig.position.x, player.worldZ - d.rig.position.z) : 99;
       const guardNear = f.content.enemies.some((e) => e instanceof Bot && !e.disabled && Math.hypot(e.worldX - d.rig.position.x, e.worldZ - d.rig.position.z) < 2.4);
-      const want = guardNear || (hasKey && pd < 2.6) || (d.open && pd < 1.6); // (an open door stays open while someone stands in it)
+      // (The partner has the card too: it goes through the doors you do.)
+      const pp = partner && Math.abs(partner.worldY - d.level * floorHeight) < 1.5 ? Math.hypot(partner.worldX - d.rig.position.x, partner.worldZ - d.rig.position.z) : 99;
+      const want = guardNear || (hasKey && (pd < 2.6 || pp < 2.6)) || (d.open && (pd < 1.6 || pp < 1.6)); // (an open door stays open while someone stands in it)
       if (pd < 2.4 && !hasKey && !d.open) toastOnce('office-door', 'KEYCARD DOOR · THE BACK OFFICES WANT A KEYCARD · THE GALLERY\'S ONE · THE GUARDS WALK THROUGH', 4800);
       d.k = Math.max(0, Math.min(1, d.k + (want ? 1 : -1) * dt * 2.6));
       d.rig.slide(d.k);
@@ -12028,7 +12288,7 @@ function startJob(n: number, course: Course | null = null, dailyRun: DailyRun | 
       player.setProne(proneNow || onWallTop(), postureState.posture === 'crouch'); // (lying along a wall top is set by the climb itself, after proneNow was worked out this frame: don't let that undo it and replay the crawl)
       player.stepLie(pdt);
       hud.setPosture(postureState.posture, silent ? pressSilent(postureState, stats.seconds).posture : nextPosture(postureState, stats.seconds));
-      updatePartner(dt, { sneak: sneaking && !inLift && !dashingNow, prone: proneNow && !inLift, dash: dashingNow }, stairs);
+      updatePartner(dt, { sneak: sneaking && !inLift && !dashingNow, prone: proneNow && !inLift, dash: dashingNow });
       // A dash that ends beside a crate or a desk ends in cover behind it.
       if (dashing && !player.dashing) {
         dashing = false;

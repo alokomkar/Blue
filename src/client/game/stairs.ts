@@ -109,3 +109,26 @@ export function stairGroundHeight(stair: Stair, worldX: number, worldZ: number, 
   const clampedT = Math.max(0, Math.min(1, t));
   return stair.fromFloorY + clampedT * (stair.toFloorY - stair.fromFloorY);
 }
+
+/** The part of a wall box that openFlightEnd looks at (scene.ts's WallBox has it). */
+export type FlightWallBox = { minX: number; maxX: number; minZ: number; maxZ: number; cover?: unknown; under?: boolean };
+
+/**
+ * Takes the solid boxes off a flight's end, on one storey (a flight is walked with the floor held to the one it was entered from, for the whole of it, so that storey's walls
+ * apply on it): the wall that shuts the stairwell's end and the first cell's worth beyond it (`outward` 1: toward +x, -1: toward -x, from the end at `edgeX`), across the stairwell's
+ * width (`z0`..`z1`, with a half metre of slack either side). Furniture (`cover`, `under`) is left. Removes them from `boxes` in place; returns how many.
+ */
+export function openFlightEnd<T extends FlightWallBox>(boxes: T[], edgeX: number, outward: 1 | -1, z0: number, z1: number, cell: number): number {
+  let removed = 0;
+  for (let i = boxes.length - 1; i >= 0; i--) {
+    const b = boxes[i]!;
+    const bx = (b.minX + b.maxX) / 2;
+    const bz = (b.minZ + b.maxZ) / 2;
+    const beyond = outward === 1 ? bx >= edgeX - 0.3 && bx <= edgeX + cell + 0.3 : bx <= edgeX + 0.3 && bx >= edgeX - cell - 0.3;
+    if (!b.cover && !b.under && beyond && bz > z0 + 0.5 && bz < z1 - 0.5) {
+      boxes.splice(i, 1);
+      removed++;
+    }
+  }
+  return removed;
+}

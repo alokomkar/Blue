@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { stairGroundHeight } from './stairs.ts';
+import { openFlightEnd, stairGroundHeight } from './stairs.ts';
 import type { Stair } from './maze.ts';
 
 const CELL = 4; // matches scene.ts's real constant — kept local since stairGroundHeight is deliberately dependency-free (see stairs.ts's header comment)
@@ -75,4 +75,26 @@ test('stairGroundHeight: a stair that descends along its axis falls toward its f
   const half = CELL / 2;
   assert.equal(stairGroundHeight(stair, 0, 1 * CELL - half, CELL), 8);
   assert.equal(stairGroundHeight(stair, 0, 1 * CELL - half + 2 * CELL, CELL), 4);
+});
+
+test('openFlightEnd: takes the end wall and the cell beyond it, across the stairwell, and leaves furniture and walls elsewhere', () => {
+  const wall = (x: number, z: number, extra: object = {}) => ({ minX: x - 0.04 * CELL, maxX: x + 0.04 * CELL, minZ: z - CELL / 2, maxZ: z + CELL / 2, ...extra });
+  const edge = 11.5 * CELL; // the stairwell's west end (its foot, on the storey above)
+  const z0 = 13.5 * CELL;
+  const z1 = 15.5 * CELL;
+  const boxes = [
+    wall(edge, 14 * CELL), // the end wall, two boxes across
+    wall(edge, 15 * CELL),
+    wall(edge - CELL, 14.5 * CELL), // the cell beyond
+    wall(edge - 2 * CELL, 14.5 * CELL), // further out: stays
+    wall(edge + 2 * CELL, 14 * CELL), // inside the stairwell (a side wall running along it): stays
+    wall(edge, 14 * CELL, { cover: 'low' }), // furniture: stays
+    wall(edge, 20 * CELL), // beside the stairwell: stays
+  ];
+  const removed = openFlightEnd(boxes, edge, -1, z0, z1, CELL);
+  assert.equal(removed, 3);
+  assert.equal(boxes.length, 4);
+  // the other way (toward +x) takes the east end's
+  const east = [wall(edge + 4 * CELL, 14 * CELL), wall(edge + 5 * CELL, 14 * CELL), wall(edge + 7 * CELL, 14 * CELL)];
+  assert.equal(openFlightEnd(east, edge + 4 * CELL, 1, z0, z1, CELL), 2);
 });
