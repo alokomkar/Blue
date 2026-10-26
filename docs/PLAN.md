@@ -121,7 +121,7 @@ Oct 26 is a Monday. Oct 31 and Nov 1 are the weekend (no Meta office hours; offi
 |---|---|---|---|
 | **0. Setup** | Mon Oct 26 | Repo, docs, accounts | README and plan committed; Meta API key created; credit and partner-credit requests sent when links are live |
 | **1. Foundations and spikes** | Tue Oct 27 – Wed Oct 28 | Baseline in, standalone build live, riskiest unknowns answered | Baseline imported with story stripped and tagged; page deployed on Vercel with a working `/api` proxy; level spec v0 loads a maze; three spikes answered (below) |
-| **Gate G1** | end of Wed Oct 28 | Decide photo-to-map scope | Go / reduced / drop |
+| **Gate G1** | end of Wed Oct 28 | Decide photo-to-map scope | Go / reduced / drop. **Early result (Oct 26): go, with the room-box pipeline, see [`SPIKES.md`](SPIKES.md)** |
 | **2. Voice and Director v1** | Thu Oct 29 – Fri Oct 30 | Two features playable | Five or more partner orders work by voice; Director produces a verified maze from a sentence; radio check-ins and habit counters in (see [`GAMEPLAY.md`](GAMEPLAY.md)) |
 | **3. Photo to map and repair loop** | Sat Oct 31 – Sun Nov 1 | Third feature, Director repair loop, four-level run order | Sketch to playable map with the verifier; visible repair loop; four levels chain in order |
 | **4. Story layer and exit level** | Mon Nov 2 | Fourth feature, shootout exit | Briefing, dossier art and newspaper generate per run; exit level uses voice orders; bunker turrets, fans and hanging lamps (the sniper-platform rebuild is deferred), timeboxed to 3 days |
@@ -131,7 +131,7 @@ Oct 26 is a Monday. Oct 31 and Nov 1 are the weekend (no Meta office hours; offi
 
 ### Phase 1 spikes (answer before building features on top of them)
 
-1. **SAM 3.1 on a sketched plan:** does "wall" produce usable masks from a phone photo of a marker sketch? How noisy are the edges?
+1. **SAM 3.1 on a sketched plan (answered Oct 26: "wall" gives nothing; Spark room boxes plus SAM box prompts work):** does "wall" produce usable masks from a phone photo of a marker sketch? How noisy are the edges?
 2. **Loops:** does the maze game (patrols, cameras, guard placement, the existing verifier assumptions) work on a layout with loops?
 3. **Voice round trip:** recorded clip to transcript to order to partner action. Is it under about 2 seconds?
 

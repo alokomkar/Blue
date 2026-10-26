@@ -69,7 +69,7 @@ Pure functions over the built level, in `src/shared/verify.ts`, returning
 |---|---|---|
 | V1 schema | Types, ranges, enum values, twist fits contract | `bad_field`, `twist_misfit` |
 | V2 grid | Every cell reachable from the start; exit reachable; entry to exit path length ≥ 12 cells; no 1-wide dead-end larger than 40% of cells | `unreachable`, `exit_close`, `mostly_dead_ends` |
-| V3 placement | No guard/dog within 8 cells of the start; no hazard on the start or exit cell; lasers don't close the only corridor to the exit (path search treating a cell with a laser as blocked for walking, but not for crouch/crawl lines); every contract station reachable | `spawn_close`, `blocked_exit`, `station_unreachable` |
+| V3 placement | No guard/dog within the game's own spawn lead of the start (8 steps, less on small floors, never under 5); no hazard on the start or exit cell; lasers don't close the only corridor to the exit (path search treating a cell with a laser as blocked for walking, but not for crouch/crawl lines); every contract station reachable | `spawn_close`, `blocked_exit`, `station_unreachable` |
 | V4 play | A scripted autopilot plays the level with detection off (ghost) and must finish the contract inside a time budget; run in the page, fast-forwarded | `autopilot_stuck`, `timeout` |
 
 - V1–V3 are cheap and run in the Director loop on the server (Node, no browser). V4 needs the game, so it runs in the
@@ -78,6 +78,15 @@ Pure functions over the built level, in `src/shared/verify.ts`, returning
   distance rule; `fitsContract`. The autopilot is new: the user's capture harness has one (`autoplay.js`, outside the
   repo, built on hooks that are not in `src/`), so the in-repo version is rewritten as a small module the game exposes
   behind `?autopilot=1` on localhost.
+
+**Corrections found while building the verifier** (`src/shared/verify.ts`, `floorbuild.ts`):
+a literal "no laser blocks the way" fails about 70% of floors with one laser (lasers sit on the long straight corridors), so
+`laserCrossings` defaults to 1; `mostly_dead_ends` is measured as the longest dead-end corridor (the game's own floors peak at
+38%), not the biggest branch; 6 x 5 floors fail `exit_close` about 80% of the time, so the minimum size is larger in practice;
+a missing big room is not a failure (the game falls back to wall consoles) but a missing stair is; the game caps guards at 4,
+not 6. The pure build covers the plan, exit, stairs and doors only: ceiling pipes, cameras, blackouts, staff lockers, vents,
+roof ways in, sentries and heavies are not built for verification, and the game's own build draws extra random numbers, so
+the loader must build from the verified floor (for example through `FloorScript`) rather than re-generate it.
 
 ## 3. The Heist Director (agent loop)
 
@@ -131,7 +140,9 @@ stay put, `follow` → trail-following, `cover_me` → the console-cover behavio
 shot, `distract` → walk to a point in the target's view and make noise, `wait_at_lift`, `regroup` →
 `regroupPartner`). Pure mapping with unit tests; the partner AI does the moving.
 
-**Budget:** record + upload + transcribe + order ≤ 2 s on a normal connection; text feedback ("…") appears instantly.
+**Budget (measured: 4.2–4.5 s for the straight pipeline, so the target is revised):** obvious commands are matched locally on the
+transcript (no second model call), so they cost only the transcription (1.6–2.7 s); only ambiguous or compound ones go to Spark
+(minimal effort, `max_tokens` 1200+, act on the first step only). The transcript appears at once so the delay reads as listening.
 No speech synthesis exists in Meta's API: replies are subtitles and a short radio sound.
 
 **Later (stretch):** a realtime relay (an always-on WebSocket server), since the realtime endpoint needs the key in the
@@ -158,14 +169,16 @@ A fresh brief per run. The frame is generic: an unnamed handler, an unnamed targ
 `{ grid: LevelSpec['grid'], rooms: Array<{ name: string; x: number; y: number }>, overlay: dataURL }` (the overlay shows what
 was recognised, for the demo).
 
-**Pipeline:**
-1. Spark vision (0–1000 grid): "Return the plan's outer bounds, its entrance, and where the most important room is."
-   → crop to the plan, the start and the goal.
-2. SAM 3.1, one request per concept: `"wall"`, `"door"`, optionally `"window"`; masks decoded with the parser library
-   (`@meta-sam/parser`), `metadata.mask_encoding: "one_bit"`.
-3. Rasterise: lay the cropped plan on a `cols × rows` grid (default 12 × 8); for each cell edge, sample mask coverage along
-   it; ≥ 35% wall coverage and no door coverage → wall, else open.
-4. Clean up: drop cells isolated from the start's component; add the exit at the goal; run V2/V3; if it fails, the
+**Pipeline (revised after the spikes, see SPIKES.md: SAM does not segment "wall" or "door", it does segment rooms from boxes):**
+1. Spark vision (0–1000 grid, minimal reasoning effort, `max_tokens` with headroom): the interior bounding box of every room
+   and the entrance. About 7 s.
+2. SAM 3.1 with **box prompts** (`<0f>1<|box;x1=..;y1=..;x2=..;y2=..;w=..;h=..|>,2<|box;...|>`, one object id per room), streamed;
+   masks decoded with `@meta-sam/parser` (`metadata.mask_encoding: "one_bit"`) and placed at their `bounds`. About 2 s.
+   `paper` as a concept prompt can crop the page first.
+3. Rasterise onto a `cols x rows` grid (default 12 x 8): a cell belongs to a room when at least 45% of it is inside that
+   room's mask, **walls are the cells between rooms**. Door gaps are where the ink between two rooms is missing, found with a
+   pixel threshold along the wall line (no model needed); the entrance is Spark's point.
+4. Clean up: drop cells isolated from the start's component; put the exit in the farthest room; run V2/V3; if it fails, the
    Director repairs (one round) by opening or closing named edges.
 
 **Test fixtures:** three phone photos of marker sketches on white paper (a maze-like plan, a plan with a loop, a plan with
