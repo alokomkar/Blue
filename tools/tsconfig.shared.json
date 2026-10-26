@@ -7,7 +7,12 @@
 
     "tsBuildInfoFile": "../dist/types/shared/tsconfig.tsbuildinfo",
 
-    "rootDir": "../src/shared"
+    "rootDir": "../src/shared",
+
+    // Modules here that run under Node (levelspec.ts and verify.ts load each other, and the tests load them) import with the .ts extension,
+    // which tsc allows only when it is not the one emitting JavaScript (Vite builds the client, Node strips the types).
+    "allowImportingTsExtensions": true,
+    "emitDeclarationOnly": true
   },
   "include": ["../src/shared/**/*"],
   "exclude": ["../src/shared/**/*.test.ts"]
