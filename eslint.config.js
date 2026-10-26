@@ -44,6 +44,20 @@ export default defineConfig([
     },
   },
   {
+    // Vercel functions (Node, Web-standard Request/Response). Tests are type-checked too: tools/tsconfig.api.json
+    // includes them and has Node types.
+    extends: [js.configs.recommended, ...tseslint.configs.recommended],
+    files: ['api/**/*.ts'],
+    languageOptions: {
+      ecmaVersion: 2023,
+      globals: globals.node,
+      parserOptions: {
+        project: ['./tools/tsconfig.api.json'],
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+  },
+  {
     // *.test.ts runs directly under Node (node:test, via `npm run
     // test:unit`'s --experimental-strip-types), not through Vite/tsc, and
     // is deliberately excluded from tools/tsconfig.client.json and
@@ -73,6 +87,7 @@ export default defineConfig([
       'devvit.config.ts',
       'src/client/**/*.test.ts',
       'src/shared/**/*.test.ts',
+      'api/**/*.test.ts',
     ],
     languageOptions: {
       parserOptions: {

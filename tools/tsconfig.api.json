@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023"],
+    "types": ["node"],
+    "outDir": "../dist/types/api",
+    "tsBuildInfoFile": "../dist/types/api/tsconfig.tsbuildinfo",
+    "rootDir": "..",
+    "allowImportingTsExtensions": true,
+    "emitDeclarationOnly": true,
+    "erasableSyntaxOnly": true,
+    "verbatimModuleSyntax": true
+  },
+  "include": ["../api/**/*"]
+}

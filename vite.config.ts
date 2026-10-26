@@ -54,6 +54,8 @@ export default defineConfig(({ mode }) => {
     root: 'src/client',
     publicDir: resolve(root, 'public'),
     plugins: original ? [originalOverlay()] : [],
+    // `npm run dev:api` serves /api/ai/* locally; only that prefix is forwarded, so the game's other /api calls still 404.
+    server: { proxy: { '/api/ai': `http://127.0.0.1:${process.env.API_PORT ?? 8787}` } },
     build: {
       outDir: resolve(root, original ? 'dist-original' : 'dist'),
       emptyOutDir: true,
