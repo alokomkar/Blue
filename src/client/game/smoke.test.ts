@@ -36,5 +36,7 @@ test('smoke is offered for a guard that has the agent, a shock for a dog, and ne
   assert.deepEqual(grenadeOffer([guard, dog], 2, 2, false), { smoke: true, shock: true });
   assert.deepEqual(grenadeOffer([guard, dog], 0, 1, false), { smoke: false, shock: true }, 'none left');
   assert.deepEqual(grenadeOffer([guard], 2, 2, true), { smoke: false, shock: false }, 'already in a cloud');
+  assert.deepEqual(grenadeOffer([{ ...guard, kind: 'sniper', dist: 30 }], 2, 2, false), { smoke: true, shock: false }, 'a sniper locked on is a reason for smoke from as far as it can see');
+  assert.deepEqual(grenadeOffer([{ ...guard, kind: 'sniper', dist: 40 }], 2, 2, false), { smoke: false, shock: false });
   assert.deepEqual(grenadeOffer([{ ...guard, dist: 20 }, { ...dog, dazed: true }, { ...guard, disabled: true }, { ...guard, alert: false }], 2, 2, false), { smoke: false, shock: false });
 });

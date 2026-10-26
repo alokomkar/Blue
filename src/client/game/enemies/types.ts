@@ -6,7 +6,7 @@
 import type { MazeCells } from '../maze';
 import type { WallBox } from '../scene';
 
-export type EnemyKind = 'patrol' | 'sentry' | 'hunter' | 'heavy' | 'watchdog' | 'crawler' | 'drone' | 'alpha';
+export type EnemyKind = 'patrol' | 'sentry' | 'hunter' | 'heavy' | 'watchdog' | 'crawler' | 'drone' | 'alpha' | 'sniper';
 
 /** How the player attacks — chosen automatically per target (weapons.ts): a silent takedown from behind, a stun shot, or an EMP. */
 export type Tool = 'takedown' | 'stun' | 'emp';
@@ -66,6 +66,10 @@ export type EnemyContext = {
   smokes?: ReadonlyArray<{ x: number; z: number; age: number }>;
   /** Everything else on this floor (guards, dogs, the rest): a guard steps off any it is standing in (squad.ts). */
   crowd?: ReadonlyArray<Enemy>;
+  /** The AI partner, for the enemies that shoot it as well as the agent (the sniper): where it stands (world, feet), how it is posed, and whether it is out of sight; null when it is down, gone or not on this floor. */
+  partner?: { x: number; z: number; y: number; prone: boolean; crouched: boolean; hidden: boolean } | null;
+  /** A sniper's round: whom it was at, and whether it landed. The game draws the tracer and plays the sound, and does the cost (the agent's hit) or puts the partner down. */
+  onSniperShot?: (enemy: Enemy, at: 'player' | 'partner', hit: boolean) => void;
   /** A sustained sighting — suspicion rises. */
   onSpotted: (enemy: Enemy) => void;
   /** A shot landed on the player. */

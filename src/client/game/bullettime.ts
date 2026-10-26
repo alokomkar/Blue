@@ -54,5 +54,6 @@ export type Approacher = { kind: EnemyKind; alert: boolean; disabled: boolean; d
 
 /** Whether something is closing in: an enemy after the agent, close enough that a few seconds matter (a mine or a drone counts too). */
 export function approaching(enemies: ReadonlyArray<Approacher>): boolean {
-  return enemies.some((e) => e.alert && !e.disabled && e.dist <= BULLET_OFFER_M);
+  // (A sniper locked on is not closing in: slowing the world would stretch its aim, which is the thing to beat.)
+  return enemies.some((e) => e.kind !== 'sniper' && e.alert && !e.disabled && e.dist <= BULLET_OFFER_M);
 }

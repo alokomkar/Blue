@@ -34,4 +34,5 @@ test('an enemy after the agent and near is a reason to offer it', () => {
   assert.equal(approaching([{ kind: 'watchdog', alert: false, disabled: false, dist: 8 }]), false);
   assert.equal(approaching([{ kind: 'patrol', alert: true, disabled: true, dist: 4 }]), false);
   assert.equal(approaching([{ kind: 'patrol', alert: true, disabled: false, dist: 30 }]), false);
+  assert.equal(approaching([{ kind: 'sniper', alert: true, disabled: false, dist: 8 }]), false, 'a sniper locked on does not slow the world: its aim is the thing to beat');
 });

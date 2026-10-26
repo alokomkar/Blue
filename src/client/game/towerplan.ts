@@ -16,6 +16,7 @@ import type { Gate } from './evade';
 import type { LineLaser } from './linelasers';
 import type { CameraPlan } from './cameras';
 import type { Piece, TowerSetId } from './towerfurniture';
+import type { PlanView } from './enemies/sniperposts';
 
 export type TowerLevel = { name: string; /** Which floor look it takes (tower.ts's themes). */ look: 'lobby' | 'balcony' | 'gallery' | 'offices' };
 export const TOWER_LEVELS: readonly TowerLevel[] = [
@@ -112,6 +113,8 @@ export type TowerPlanData = {
   lasers: Record<number, { sweepers: Sweeper[]; sliders: Slider[]; gates: Gate[]; /** Line lasers (linelasers.ts) across a doorway in a partition wall. */ lines?: LineLaser[] }>;
   patrols: TowerPatrol[];
   posts: TowerPost[];
+  /** The snipers' posts, ranked (enemies/sniperposts.ts): filled in when a level is started (setSniperPosts), so a plan built for the tests or the exit level has none. The game takes as many as the job calls for. */
+  snipers: TowerPost[];
   dogs: TowerDog[];
   /** Alpha units (enemies/alpha.ts), one on each storey: each roams a section of its own and, on the agent's storey, hunts them by ear and by scent. */
   alphas: TowerDog[];
@@ -314,6 +317,7 @@ export function blockedP(p: TowerPlanData, level: number, x: number, y: number):
   if (level === 0 && Math.abs(x - p.start.x) <= 1 && Math.abs(y - p.start.y) <= 1) return true;
   if (level === 0 && Math.abs(x - p.exit.x) <= 1 && Math.abs(y - p.exit.y) <= 1) return true;
   if (p.posts.some((g) => g.level === level && g.x === x && g.y === y)) return true;
+  if (p.snipers.some((g) => g.level === level && g.x === x && g.y === y)) return true;
   if (p.officeDoors.some((d) => d.level === level && d.x === x && (d.y === y || d.y - 1 === y))) return true;
   return false;
 }
@@ -521,7 +525,7 @@ function buildPlan(s: Spec, seed = 0): TowerPlanData {
     id: s.id, cols: s.cols, rows: s.rows, floors, start: s.start, exit: s.exit, stairs, lifts,
     keycard: { level: 2, x: s.keycard.x, y: s.keycard.y }, cards: [], seed, heist: { x: s.heistX, y: s.rows - 1 }, heistLift: { x: s.heistX, y: s.rows + 2 },
     walls, doorways: [], shut: [], bridges, lasers: { 2: { sweepers: [{ x: s.lasers.sweeper.x, y: s.lasers.sweeper.y, phase: 0, dir: 1 }], sliders: [{ ...s.lasers.slider, phase: 0.3, speed: 1.3 }], gates: [{ x: s.lasers.gate.x, y: s.lasers.gate.y, spanX: s.lasers.gate.spanX, kind: 'pulse', phase: 0.2 }] } },
-    bridgeBonus: { level: 2, x: 0, z: 0 }, patrols: [], posts: [], dogs: [], alphas: [], pylons: [], cameras: [], security: { level: 1, cells: room }, officeDoors, fixed: [],
+    bridgeBonus: { level: 2, x: 0, z: 0 }, patrols: [], posts: [], snipers: [], dogs: [], alphas: [], pylons: [], cameras: [], security: { level: 1, cells: room }, officeDoors, fixed: [],
   };
   const rand = makeRng(77 + s.id.length * 31 + s.cols * 7 + s.rows + seed * 7919);
 
@@ -1055,6 +1059,7 @@ export function validatePlan(p: TowerPlanData): string[] {
     }
   }
   for (const g of p.posts) if (!W(g.level, g.x, g.y)) err(`a post on floor ${g.level} is off the floor at ${g.x},${g.y}`);
+  for (const g of p.snipers) if (!W(g.level, g.x, g.y)) err(`a sniper's post on floor ${g.level} is off the floor at ${g.x},${g.y}`);
   for (const d of p.dogs) if (!W(d.level, d.x, d.y)) err(`a dog on floor ${d.level} is off the floor at ${d.x},${d.y}`);
   for (const a of p.alphas) if (!W(a.level, a.x, a.y)) err(`an alpha on floor ${a.level} is off the floor at ${a.x},${a.y}`);
   const lasers = p.lasers[2];
@@ -1402,6 +1407,56 @@ export function selectTowerPlan(id: TowerSetId, seed = 0): TowerPlanData {
 }
 
 export const activePlan = (): TowerPlanData => ACTIVE;
+
+/** Sets the plan's sniper posts (they are worked out from the plan itself, enemies/sniperposts.ts, once the level starts): the furniture, laid out after, keeps clear of them. */
+export function setSniperPosts(p: TowerPlanData, posts: TowerPost[]): void {
+  p.snipers = posts;
+}
+
+/**
+ * What the sniper planner (enemies/sniperposts.ts) asks of a plan: where someone can stand, what is already claimed (a post, a round's start, a dog, a card, a console, a camera's panel, the security
+ * room), where the agent comes onto a storey, what a look passes (no wall drawn; a void) and what stops one (a lift's cab, a pylon), and where a walker can get to.
+ */
+export function sniperViewOf(p: TowerPlanData): PlanView {
+  const draw = [0, 1, 2, 3].map((l) => drawCellsP(p, l));
+  const play = [0, 1, 2, 3].map((l) => playCellsP(p, l));
+  const reached = reachableP(p, true);
+  const claimed = new Set<string>();
+  const claim = (l: number, x: number, y: number): void => void claimed.add(`${l},${x},${y}`);
+  const rounds = new Set<string>();
+  for (const r of p.patrols) {
+    claim(r.level, r.route[0]!.x, r.route[0]!.y);
+    for (const c of r.route) rounds.add(`${r.level},${c.x},${c.y}`);
+  }
+  for (const d of [...p.dogs, ...p.alphas]) claim(d.level, d.x, d.y);
+  for (const f of p.fixed) claim(f.level, f.x, f.y);
+  for (const c of p.security.cells) claim(p.security.level, c.x, c.y);
+  for (const c of p.cameras) claim(c.level, Math.round(c.x / 4), Math.round(c.z / 4));
+  return {
+    cols: p.cols,
+    rows: p.rows,
+    walk: (l, x, y) => walkableP(p, l, x, y),
+    taken: (l, x, y) => blockedP(p, l, x, y) || claimed.has(`${l},${x},${y}`),
+    busy: (l, x, y) => rounds.has(`${l},${x},${y}`),
+    arrivals: (l) => {
+      const out: Cell[] = [];
+      for (const s of p.stairs) {
+        if (!touches(s, l)) continue;
+        for (let x = s.x; x < s.x + s.width; x++) out.push(s.fromLevel === l ? { x, y: s.y - 1 } : { x, y: s.y + s.run });
+      }
+      for (const lf of p.lifts) if (lf.serves.includes(l)) out.push(liftFront(lf));
+      for (const c of p.cards) if (c.level === l) out.push({ x: c.x, y: c.y });
+      if (l === 0) out.push(p.start);
+      return out;
+    },
+    clear: (l, x, y, way) => draw[l]![y]![x]![way],
+    deck: (l, x, y) => p.bridges.some((b) => b.level === l && b.y === y && x > Math.min(b.fromX, b.toX) && x < Math.max(b.fromX, b.toX)),
+    drop: (l, x, y) => !walkableP(p, l, x, y) && !isLiftP(p, l, x, y) && !isPylonP(p, l, x, y),
+    solid: (l, x, y) => isLiftP(p, l, x, y) || isPylonP(p, l, x, y),
+    open: (l, x, y, way) => play[l]![y]![x]![way],
+    reached: (l, x, y) => reached.has(`${l},${x},${y}`),
+  };
+}
 /** The section of storey `level` that holds cell (x, y). */
 export const sectionOf = (level: number, x: number, y: number): Cell[] => sectionOfP(ACTIVE, level, x, y);
 

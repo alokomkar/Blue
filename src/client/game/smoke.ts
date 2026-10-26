@@ -27,10 +27,12 @@ export const SHOCK_NOISE_CELLS = 5;
 /** A guard onto the agent within this many metres is a reason to offer smoke; a dog onto them, a reason to offer a shock. */
 export const SMOKE_OFFER_M = 11;
 export const SHOCK_OFFER_M = 10;
+/** A sniper locked on the agent is a reason to offer smoke from as far as it can see: the cloud is what breaks its line. */
+export const SNIPER_SMOKE_OFFER_M = 34;
 
 /** Which grenade is worth offering for the hunters about: smoke for a guard with the agent in sight, a shock for a dog on their trail. */
 export function grenadeOffer(hunters: ReadonlyArray<{ kind: string; alert: boolean; disabled: boolean; dazed: boolean; dist: number }>, smokeLeft: number, shockLeft: number, inCloud: boolean): { smoke: boolean; shock: boolean } {
-  const guard = hunters.some((h) => h.alert && !h.disabled && !h.dazed && h.kind !== 'watchdog' && h.kind !== 'crawler' && h.kind !== 'drone' && h.dist <= SMOKE_OFFER_M);
+  const guard = hunters.some((h) => h.alert && !h.disabled && !h.dazed && h.kind !== 'watchdog' && h.kind !== 'crawler' && h.kind !== 'drone' && h.dist <= (h.kind === 'sniper' ? SNIPER_SMOKE_OFFER_M : SMOKE_OFFER_M));
   const dog = hunters.some((h) => h.alert && !h.disabled && !h.dazed && h.kind === 'watchdog' && h.dist <= SHOCK_OFFER_M);
   return { smoke: smokeLeft > 0 && guard && !inCloud, shock: shockLeft > 0 && dog };
 }
