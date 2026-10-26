@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Phase 0 · Project history</title><style>
+:root{--bg:#f6f7f9;--surface:#fff;--surface-2:#eef1f5;--text:#151a22;--muted:#5a6575;--line:#d9dee6;--accent:#1664d9;--accent-soft:#e2edfc;--in:#a15c00;--out:#17803d;--plain:#1664d9;--radius:12px;--mono:ui-monospace,SFMono-Regular,Menlo,monospace}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#0e1218;--surface:#161c25;--surface-2:#1d2531;--text:#e8ecf2;--muted:#9aa5b5;--line:#2a3441;--accent:#6aa5ff;--accent-soft:#1b2a44;--in:#e5a23a;--out:#4cc77d;--plain:#6aa5ff}}
+:root[data-theme=dark]{--bg:#0e1218;--surface:#161c25;--surface-2:#1d2531;--text:#e8ecf2;--muted:#9aa5b5;--line:#2a3441;--accent:#6aa5ff;--accent-soft:#1b2a44;--in:#e5a23a;--out:#4cc77d;--plain:#6aa5ff}
+*{box-sizing:border-box}html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+a{color:var(--accent)}code{font-family:var(--mono);font-size:.9em;background:var(--surface-2);padding:1px 5px;border-radius:5px}
+.wrap{max-width:900px;margin:0 auto;padding:0 16px}
+.bar{position:sticky;top:0;z-index:5;background:color-mix(in srgb,var(--bg) 90%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.bar .wrap{display:flex;align-items:center;gap:8px;height:54px;overflow-x:auto}
+.bar a.tab{white-space:nowrap;text-decoration:none;color:var(--muted);padding:6px 10px;border-radius:8px;font-size:14px}
+.bar a.tab.on{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.bar .sp{flex:1}
+.bar button{font:inherit;border:1px solid var(--line);background:var(--surface);color:inherit;border-radius:8px;width:36px;height:36px;cursor:pointer;flex:none}
+h1{font-size:clamp(26px,5vw,38px);line-height:1.15;margin:28px 0 8px}h2{font-size:24px;margin:28px 0 8px}
+.lede{color:var(--muted);max-width:720px}
+.cards{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));margin:18px 0}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px}
+.card h3{margin:0 0 4px;font-size:18px}.card .meta{color:var(--muted);font-size:13px;margin-bottom:8px}
+.card ul{margin:8px 0 0;padding-left:18px;font-size:15px}
+.commit{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);margin:14px 0;overflow:hidden}
+.commit header{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 12px;padding:12px 16px;background:var(--surface-2);border-bottom:1px solid var(--line)}
+.commit header h3{flex-basis:100%;margin:0;font-size:17px}
+.hash{font-family:var(--mono);font-size:13px;background:var(--accent-soft);padding:2px 8px;border-radius:999px;text-decoration:none}
+.time{color:var(--muted);font-size:13px}
+.row{display:grid;grid-template-columns:110px 1fr;gap:12px;padding:12px 16px;border-top:1px solid var(--line)}
+.row:first-of-type{border-top:0}
+.row h4{margin:2px 0;font-size:12px;text-transform:uppercase;letter-spacing:.06em}
+.row.in h4{color:var(--in)}.row.out h4{color:var(--out)}.row.plain h4{color:var(--plain)}
+.row.plain{background:color-mix(in srgb,var(--accent-soft) 45%,transparent)}
+.row p{margin:0 0 6px}.row ul{margin:4px 0;padding-left:20px}.row li{margin:3px 0}
+.extra{padding:4px 16px 14px}
+.extra img,.row img{max-width:100%;height:auto;border-radius:8px;border:1px solid var(--line);display:block}
+.table-wrap{overflow-x:auto;margin:10px 0}table{border-collapse:collapse;width:100%}
+th,td{border:1px solid var(--line);padding:8px 10px;vertical-align:top;text-align:left;font-size:15px}th{background:var(--surface-2);font-size:13px}
+td img{min-width:220px}
+pre{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:12px;overflow-x:auto;font-size:13px;line-height:1.35}pre code{background:none;padding:0}
+.summary{border:2px solid var(--accent);border-radius:var(--radius);padding:4px 18px 14px;background:var(--surface);margin:24px 0}
+.summary h3{color:var(--accent)}
+.pager{display:flex;justify-content:space-between;gap:12px;margin:28px 0 48px}
+.pager a{border:1px solid var(--line);background:var(--surface);border-radius:var(--radius);padding:10px 14px;text-decoration:none}
+.timeline{width:100%}.timeline td:first-child{font-family:var(--mono);white-space:nowrap}
+@media(max-width:600px){.row{grid-template-columns:1fr;gap:2px}}
+</style></head>
+<body><div class="bar"><div class="wrap"><a class="tab" href="history.html">Overview</a><a class="tab on" href="phase-0.html">Phase 0</a><a class="tab" href="pre-event.html">Pre-event</a><a class="tab" href="phase-1.html">Phase 1</a><a class="tab" href="index.html">Plan page</a><span class="sp"></span><button id="theme" aria-label="Toggle theme" title="Toggle theme">◐</button></div></div><main class="wrap"><h1>Phase 0: Setup, plan and the baseline (Oct 26, 14:43 to 17:20, plus planning docs in the evening)</h1>
+
+<p class="lede">12 commits, in order. Each shows what was asked (input), what came out (output) and what it means in plain terms.</p>
+<article class="commit" id="c-6a5c6c4">
+  <header><a class="hash" href="https://github.com/alokomkar/Blue/commit/6a5c6c4">6a5c6c4</a><span class="time">14:43 IST</span><h3>Add initial README and .gitignore</h3></header>
+  <section class="row in"><h4>Input</h4><div><p>you asked for the project's first README after I read the Cerebral Valley event page (rules, tracks, prizes, schedule) and we settled the idea: Operation Blueprint in 3D, with four demo levels and Meta's models.</p></div></section>
+  <section class="row out"><h4>Output</h4><div><p><a href="https://github.com/alokomkar/Blue/blob/main/README.md"><code>README.md</code></a> (what the project is, the four AI features, the four demo levels, what counts as new work, the planned architecture) and <code>.gitignore</code> (keeps <code>.env</code>, <code>node_modules</code>, build output out of git).</p></div></section>
+  <section class="row plain"><h4>In plain terms</h4><div><p>the front door of the project. It says honestly that nothing is built yet, so no one reading it is misled, and it sets up the rule that secret keys never get committed.</p></div></section>
+  
+</article>
+<article class="commit" id="c-94029bb">
+  <header><a class="hash" href="https://github.com/alokomkar/Blue/commit/94029bb">94029bb</a><span class="time">14:47 IST</span><h3>Add interactive HTML readme</h3></header>
+  <section class="row in"><h4>Input</h4><div><p>you asked for an interactive page you could read, not just a markdown file.</p></div></section>
+  <section class="row out"><h4>Output</h4><div><p><a href="index.html"><code>docs/index.html</code></a>, one self-contained page: a filter that shows which Meta model powers which feature, feature detail flows, a level table, a tickable phase list (saved in your browser), a storyboard of the 3-minute video, scope tiers, risks and a deadline countdown. Checked in a browser: no console errors, no sideways scroll at phone width.</p></div></section>
+  <section class="row plain"><h4>In plain terms</h4><div><p>the plan as something you can click through, so you can see the whole project at once.</p></div></section>
+  
+</article>
+<article class="commit" id="c-7c200d7">
+  <header><a class="hash" href="https://github.com/alokomkar/Blue/commit/7c200d7">7c200d7</a><span class="time">14:47 IST</span><h3>Add project plan: Meta model use, expected result and phases</h3></header>
+  <section class="row in"><h4>Input</h4><div><p>you asked for the details: what we intend to build, how each Meta model is used, what we expect at the end, then phases from the timeline. I had read Meta's API documentation (model list, pricing, image, SAM, voice, structured output) to ground it.</p></div></section>
+  <section class="row out"><h4>Output</h4><div><p><a href="PLAN.md"><code>docs/PLAN.md</code></a>: goal, the rules that shape the work, how each model is used, the four levels, the expected result against the four judging criteria, scope tiers (Must, Should, Stretch), the phases with dates, the demo video storyboard, hosting, risks.</p></div></section>
+  <section class="row plain"><h4>In plain terms</h4><div><p>the written plan everything else is measured against. Two facts from the docs corrected my first brainstorm: Muse Wonder is a coding and agent model, not a creative one, and Meta has no text-to-speech.</p></div></section>
+  
+</article>
+<article class="commit" id="c-69b074f">
+  <header><a class="hash" href="https://github.com/alokomkar/Blue/commit/69b074f">69b074f</a><span class="time">15:51 IST</span><h3>Baseline: game engine and mechanics carried over from the earlier project</h3></header>
+  <section class="row in"><h4>Input</h4><div><p>you asked for the game's levels in the public repo with its mechanics but none of its story, and with only assets we may redistribute (CC0). Source: the <code>feat/tower</code> branch of your private game.</p></div></section>
+  <section class="row out"><h4>Output</h4><div><p>338 files, 76,896 lines: the 3D engine, movement, guards, dogs, cameras, lasers, combat, the maze, tower, bunker and shootout-exit levels and their tests, as a standalone web build. The story's letters, cutscenes, characters, voice files and one story level were replaced by neutral stubs or removed, the boss renamed, and the original (Mixamo) character files swapped for CC0 ones. Checks: type-check clean, lint clean, 836 unit tests pass, every level played headlessly by a test helper (all four ran with no errors; the later co-op rounds repeated this).</p></div></section>
+  <section class="row plain"><h4>In plain terms</h4><div><p>the starting line. Everything judges will be told is "carried over" is in this one commit and its tag, <code>baseline-pre-hackathon</code>, so everything after it can be told apart. It still plays like your game, with plainer character bodies.</p></div></section>
+  
+</article>
+<article class="commit" id="c-33eaae9">
+  <header><a class="hash" href="https://github.com/alokomkar/Blue/commit/33eaae9">33eaae9</a><span class="time">15:52 IST</span><h3>Add the original-animation build mode and its restore script</h3></header>
+  <section class="row in"><h4>Input</h4><div><p>you played the baseline and said the crouch, the walk and the way the gun is held looked different. I compared it to your original, found the cause (the CC0 swap), and you chose the hybrid: the public repo uses CC0, the live demo uses your original animations from a private folder.</p></div></section>
+  <section class="row out"><h4>Output</h4><div><p><code>npm run build:original</code> (a Vite mode that overlays ten original source files and serves the original models from <code>public/models/private/</code>, both git-ignored) and <code>scripts/restore-private-assets.sh</code>. A headless smoke test of the tower loaded your original guard, agent and crouch files with no errors.</p></div></section>
+  <section class="row plain"><h4>In plain terms</h4><div><p>two builds of the same game. Anyone can build the public one; only you can build the one that looks exactly like the original.</p></div></section>
+  
+</article>
+<article class="commit" id="c-6bcb47a">
+  <header><a class="hash" href="https://github.com/alokomkar/Blue/commit/6bcb47a">6bcb47a</a><span class="time">15:54 IST</span><h3>Add the three sound effects, from Pixabay, with their credit</h3></header>
+  <section class="row in"><h4>Input</h4><div><p>you said the game's sounds come from Pixabay.</p></div></section>
+  <section class="row out"><h4>Output</h4><div><p><code>alarm.m4a</code>, <code>emp-discharge.mp3</code>, <code>stun-shot.mp3</code> and a credit file. The code loads only these three audio files; everything else is synthesised.</p></div></section>
+  <section class="row plain"><h4>In plain terms</h4><div><p>the missing sound effects are back, with the licence stated. Pixabay allows use in a game but not re-sharing the files on their own, which a public repo comes close to, so that risk is noted.</p></div></section>
+  
+</article>
+<article class="commit" id="c-710daf1">
+  <header><a class="hash" href="https://github.com/alokomkar/Blue/commit/710daf1">710daf1</a><span class="time">17:20 IST</span><h3>Keep the private rename rules out of the repo</h3></header>
+  <section class="row in"><h4>Input</h4><div><p>the pre-push scan found the old boss's name inside the restore script.</p></div></section>
+  <section class="row out"><h4>Output</h4><div><p>the rename rules moved to a git-ignored file and the script reads them if present.</p></div></section>
+  <section class="row plain"><h4>In plain terms</h4><div><p>closed a small leak going forward. The name is still in earlier commits (one script line); scrubbing it would mean rewriting history, which I offered and you haven't asked for.</p></div></section>
+  
+</article>
+<article class="commit" id="c-a6ea84e">
+  <header><a class="hash" href="https://github.com/alokomkar/Blue/commit/a6ea84e">a6ea84e</a><span class="time">20:52 IST</span><h3>Add the gameplay track: radio check-ins, habit counters, snipers, taller bunker</h3></header>
+  <section class="row in"><h4>Input</h4><div><p>your play-test: all levels feel alike, it plays like run and gun, little reason to continue, the dog is easy, the alpha is no problem. I read the enemy code and suggested six ideas; you chose radio check-ins, counters to the player's habits, tower snipers, and for the bunker turrets, a taller space with sniper platforms, bridges, fans and hanging lamps.</p></div></section>
+  <section class="row out"><h4>Output</h4><div><p><a href="GAMEPLAY.md"><code>docs/GAMEPLAY.md</code></a>: each feature designed against the real code, constraints, a schedule.</p></div></section>
+  <section class="row plain"><h4>In plain terms</h4><div><p>your feedback turned into a build plan, without building anything yet.</p></div></section>
+  
+</article>
+<article class="commit" id="c-fc2ec29">
+  <header><a class="hash" href="https://github.com/alokomkar/Blue/commit/fc2ec29">fc2ec29</a><span class="time">21:01 IST</span><h3>Gameplay track: riot-shield guards are the shootout exit's signature threat</h3></header>
+  <section class="row in"><h4>Input</h4><div><p>you chose riot-shield guards that need a flash grenade to open.</p></div></section>
+  <section class="row out"><h4>Output</h4><div><p>the design added: reuses the shield rules the Warden boss already has; flagged that the shield lives in a file the private build overwrites, so the change must be applied in both places.</p></div></section>
+  <section class="row plain"><h4>In plain terms</h4><div><p>the exit level gets its own kind of enemy.</p></div></section>
+  
+</article>
+<article class="commit" id="c-f9a2215">
+  <header><a class="hash" href="https://github.com/alokomkar/Blue/commit/f9a2215">f9a2215</a><span class="time">21:10 IST</span><h3>Docs: pre-event work is committed under its real date and tagged, not moved into the window</h3></header>
+  <section class="row in"><h4>Input</h4><div><p>you asked why gameplay couldn't be built right away, since it's built with Claude and not Meta's models.</p></div></section>
+  <section class="row out"><h4>Output</h4><div><p>a correction in the docs. The tool doesn't matter; the date does. Work done before the building period is committed under its real date and tagged, not moved into the window. (I had said I would commit it on Oct 27, which would have misrepresented when it was made.)</p></div></section>
+  <section class="row plain"><h4>In plain terms</h4><div><p>an honesty fix about the "new work only" rule.</p></div></section>
+  
+</article>
+<article class="commit" id="c-b99f6d2">
+  <header><a class="hash" href="https://github.com/alokomkar/Blue/commit/b99f6d2">b99f6d2</a><span class="time">21:19 IST</span><h3>Gameplay track: the bunker platforms cost 19 to 25 days, so turrets, fans and lamps first</h3></header>
+  <section class="row in"><h4>Input</h4><div><p>a read-only study of the bunker engine (no code changed), answering whether 8 m storeys, 6 m platforms, stairs, bridges and snipers fit.</p></div></section>
+  <section class="row out"><h4>Output</h4><div><p>the bunker is already tall (7 m storeys, 6 m walls); the full design costs about 19 to 25 focused days (most of it groundwork the game lacks: one height per storey, no height bands in collision, flat stun shots, partner support). Default chosen: turrets, fans and hanging lamps, 3 days; snipers stay in the tower; platforms deferred.</p></div></section>
+  <section class="row plain"><h4>In plain terms</h4><div><p>the platform idea is great but too big for nine days alongside four AI features, so it moves to "later" and the cheap, visible parts go first.</p></div></section>
+  
+</article>
+<article class="commit" id="c-a4feea1">
+  <header><a class="hash" href="https://github.com/alokomkar/Blue/commit/a4feea1">a4feea1</a><span class="time">21:23 IST</span><h3>Add the design for the four AI features</h3></header>
+  <section class="row in"><h4>Input</h4><div><p>you asked me to finish the design and prep before the window opened.</p></div></section>
+  <section class="row out"><h4>Output</h4><div><p><a href="DESIGN.md"><code>docs/DESIGN.md</code></a>: the level spec, the verifier's layers, the Director's loop, the voice order grammar, the story layer, the photo-to-map pipeline, the repo layout, your morning checklist and the first two days' order. Grounded in the code's real difficulty options, contract ids, twist ids and places.</p></div></section>
+  <section class="row plain"><h4>In plain terms</h4><div><p>the blueprint for the AI work, so building starts without redesign.</p></div></section>
+  
+</article>
+<section class="summary"><h3>Phase 0 summary</h3><ul><li><strong>Achieved:</strong> a public repo with a README, an interactive plan, a written plan, a story-free baseline of the game that plays all four levels, a private way to build it with your original look, the gameplay and design documents.</li><li><strong>Checked:</strong> 836 tests, lint, type-check, a headless play of every level.</li><li><strong>Not achieved / honest limits:</strong> the baseline's CC0 characters look plainer than the original (the private build fixes that for the demo); one old name remains in the history of one script.</li></ul></section>
+<nav class="pager"><span></span><span><a href="pre-event.html">Pre-event →</a></span></nav></main><script>(function(){try{var t=localStorage.getItem('hist-theme');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}
+document.getElementById('theme').addEventListener('click',function(){var r=document.documentElement,c=r.getAttribute('data-theme'),d=c?c==='dark':matchMedia('(prefers-color-scheme:dark)').matches,n=d?'light':'dark';r.setAttribute('data-theme',n);try{localStorage.setItem('hist-theme',n)}catch(e){}})})();</script></body></html>

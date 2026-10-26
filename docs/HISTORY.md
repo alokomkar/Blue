@@ -228,6 +228,14 @@ Rooms recovered from the sketch, as a 16 x 16 grid (digits are rooms, dots are w
 |---|---|
 | ![coop bunker](img/coop-bunker.jpg) | ![coop exit](img/coop-exit.jpg) |
 
+### ce1d426 · 22:34 · Add the project history: every commit in plain terms, phase summaries, screenshots
+- **Input:** you asked for a record of each commit with its input, output and a plain explanation, a summary at the end
+  of each phase, and screenshots where useful.
+- **Output:** this file, with an entry for each of the first 19 commits, three part summaries, and 9 screenshots in
+  `docs/img/` (about 0.5 MB): the bunker and exit before and after lighting, the partner on each of the four levels, the
+  Muse Image sketch. Linked from the README and the interactive page.
+- **In plain terms:** a diary of the project you can read without knowing git.
+
 ### Phase 1 summary (so far, in progress)
 - **Achieved:** the API plumbing with a safe key path; the level spec and verifier; the Meta key tested against every
   model we plan to use; the three biggest risks (SAM on a sketch, structured output, voice latency) answered with real

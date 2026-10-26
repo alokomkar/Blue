@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pre-event · Project history</title><style>
+:root{--bg:#f6f7f9;--surface:#fff;--surface-2:#eef1f5;--text:#151a22;--muted:#5a6575;--line:#d9dee6;--accent:#1664d9;--accent-soft:#e2edfc;--in:#a15c00;--out:#17803d;--plain:#1664d9;--radius:12px;--mono:ui-monospace,SFMono-Regular,Menlo,monospace}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#0e1218;--surface:#161c25;--surface-2:#1d2531;--text:#e8ecf2;--muted:#9aa5b5;--line:#2a3441;--accent:#6aa5ff;--accent-soft:#1b2a44;--in:#e5a23a;--out:#4cc77d;--plain:#6aa5ff}}
+:root[data-theme=dark]{--bg:#0e1218;--surface:#161c25;--surface-2:#1d2531;--text:#e8ecf2;--muted:#9aa5b5;--line:#2a3441;--accent:#6aa5ff;--accent-soft:#1b2a44;--in:#e5a23a;--out:#4cc77d;--plain:#6aa5ff}
+*{box-sizing:border-box}html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+a{color:var(--accent)}code{font-family:var(--mono);font-size:.9em;background:var(--surface-2);padding:1px 5px;border-radius:5px}
+.wrap{max-width:900px;margin:0 auto;padding:0 16px}
+.bar{position:sticky;top:0;z-index:5;background:color-mix(in srgb,var(--bg) 90%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.bar .wrap{display:flex;align-items:center;gap:8px;height:54px;overflow-x:auto}
+.bar a.tab{white-space:nowrap;text-decoration:none;color:var(--muted);padding:6px 10px;border-radius:8px;font-size:14px}
+.bar a.tab.on{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.bar .sp{flex:1}
+.bar button{font:inherit;border:1px solid var(--line);background:var(--surface);color:inherit;border-radius:8px;width:36px;height:36px;cursor:pointer;flex:none}
+h1{font-size:clamp(26px,5vw,38px);line-height:1.15;margin:28px 0 8px}h2{font-size:24px;margin:28px 0 8px}
+.lede{color:var(--muted);max-width:720px}
+.cards{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));margin:18px 0}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px}
+.card h3{margin:0 0 4px;font-size:18px}.card .meta{color:var(--muted);font-size:13px;margin-bottom:8px}
+.card ul{margin:8px 0 0;padding-left:18px;font-size:15px}
+.commit{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);margin:14px 0;overflow:hidden}
+.commit header{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 12px;padding:12px 16px;background:var(--surface-2);border-bottom:1px solid var(--line)}
+.commit header h3{flex-basis:100%;margin:0;font-size:17px}
+.hash{font-family:var(--mono);font-size:13px;background:var(--accent-soft);padding:2px 8px;border-radius:999px;text-decoration:none}
+.time{color:var(--muted);font-size:13px}
+.row{display:grid;grid-template-columns:110px 1fr;gap:12px;padding:12px 16px;border-top:1px solid var(--line)}
+.row:first-of-type{border-top:0}
+.row h4{margin:2px 0;font-size:12px;text-transform:uppercase;letter-spacing:.06em}
+.row.in h4{color:var(--in)}.row.out h4{color:var(--out)}.row.plain h4{color:var(--plain)}
+.row.plain{background:color-mix(in srgb,var(--accent-soft) 45%,transparent)}
+.row p{margin:0 0 6px}.row ul{margin:4px 0;padding-left:20px}.row li{margin:3px 0}
+.extra{padding:4px 16px 14px}
+.extra img,.row img{max-width:100%;height:auto;border-radius:8px;border:1px solid var(--line);display:block}
+.table-wrap{overflow-x:auto;margin:10px 0}table{border-collapse:collapse;width:100%}
+th,td{border:1px solid var(--line);padding:8px 10px;vertical-align:top;text-align:left;font-size:15px}th{background:var(--surface-2);font-size:13px}
+td img{min-width:220px}
+pre{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:12px;overflow-x:auto;font-size:13px;line-height:1.35}pre code{background:none;padding:0}
+.summary{border:2px solid var(--accent);border-radius:var(--radius);padding:4px 18px 14px;background:var(--surface);margin:24px 0}
+.summary h3{color:var(--accent)}
+.pager{display:flex;justify-content:space-between;gap:12px;margin:28px 0 48px}
+.pager a{border:1px solid var(--line);background:var(--surface);border-radius:var(--radius);padding:10px 14px;text-decoration:none}
+.timeline{width:100%}.timeline td:first-child{font-family:var(--mono);white-space:nowrap}
+@media(max-width:600px){.row{grid-template-columns:1fr;gap:2px}}
+</style></head>
+<body><div class="bar"><div class="wrap"><a class="tab" href="history.html">Overview</a><a class="tab" href="phase-0.html">Phase 0</a><a class="tab on" href="pre-event.html">Pre-event</a><a class="tab" href="phase-1.html">Phase 1</a><a class="tab" href="index.html">Plan page</a><span class="sp"></span><button id="theme" aria-label="Toggle theme" title="Toggle theme">◐</button></div></div><main class="wrap"><h1>Carried-over work finished around the kickoff (tag <code>pre-hackathon-final</code>, 21:56 IST)</h1>
+
+<p class="lede">2 commits, in order. Each shows what was asked (input), what came out (output) and what it means in plain terms.</p>
+<article class="commit" id="c-7192f48">
+  <header><a class="hash" href="https://github.com/alokomkar/Blue/commit/7192f48">7192f48</a><span class="time">21:56 IST</span><h3>Pre-hackathon: partner on the tower, bunker and exit, lit bunker and exit, bunker stairs both ways</h3></header>
+  <section class="row in"><h4>Input</h4><div><p>(1) you wanted co-op from the start of the game on every level; (2) you asked for the bunker and the shootout to be well lit; (3) you found a bug: leave a task on a lower bunker level, go up, and you cannot come back down.</p></div></section>
+  <section class="row out"><h4>Output</h4><div><ul><ul><li><strong>Co-op:</strong> the AI partner is switched on for the tower, bunker and exit (it was maze-only), with the first floor-to-floor routing.</li><li><strong>Lighting:</strong> bunker lit with cool strip light, the exit with warm light and every storey known; checked in before-and-after screenshots below (<code>?dark=1</code> brings the bunker's darkness back).</li><li><strong>Bunker stairs:</strong> cause found: a wall at the foot of each flight on the upper storey stopped anyone walking down, and the earlier test walkers hid it by teleporting. Fixed by opening that wall like the one at the head; verified on every flight of five bunker plans with real key presses, and the partner followed both ways. 842 tests pass.</li></ul></ul></div></section>
+  <section class="row plain"><h4>In plain terms</h4><div><p>the three things you asked for tonight, committed and tagged as the line between carried-over and new work.</p></div></section>
+  <div class="extra"><div class="table-wrap"><table><thead><tr><th>Bunker, before</th><th>Bunker, after</th></tr></thead><tbody><tr><td><img src="img/bunker-dark.jpg" alt="bunker dark"></td><td><img src="img/bunker-lit.jpg" alt="bunker lit"></td></tr></tbody></table></div>
+<div class="table-wrap"><table><thead><tr><th>Shootout exit, before</th><th>Shootout exit, after</th></tr></thead><tbody><tr><td><img src="img/exit-dark.jpg" alt="exit dark"></td><td><img src="img/exit-lit.jpg" alt="exit lit"></td></tr></tbody></table></div></div>
+</article>
+<article class="commit" id="c-609907f">
+  <header><a class="hash" href="https://github.com/alokomkar/Blue/commit/609907f">609907f</a><span class="time">21:59 IST</span><h3>Plan: the VR path, kept open but not scheduled</h3></header>
+  <section class="row in"><h4>Input</h4><div><p>you showed your application, which describes a VR game, and asked whether the game can be ported to VR later.</p></div></section>
+  <section class="row out"><h4>Output</h4><div><p>a "VR later" section in the plan: three.js supports WebXR, the game already has a first-person mode, what a port needs (VR input, a camera rig, in-world panels, comfort options, a lighter render profile). Not scheduled.</p></div></section>
+  <section class="row plain"><h4>In plain terms</h4><div><p>yes, later; the submission stays the web build, and the plan keeps the door open.</p></div></section>
+  
+</article>
+
+<nav class="pager"><span><a href="phase-0.html">← Phase 0</a></span><span><a href="phase-1.html">Phase 1 →</a></span></nav></main><script>(function(){try{var t=localStorage.getItem('hist-theme');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}
+document.getElementById('theme').addEventListener('click',function(){var r=document.documentElement,c=r.getAttribute('data-theme'),d=c?c==='dark':matchMedia('(prefers-color-scheme:dark)').matches,n=d?'light':'dark';r.setAttribute('data-theme',n);try{localStorage.setItem('hist-theme',n)}catch(e){}})})();</script></body></html>
