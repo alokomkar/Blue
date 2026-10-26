@@ -12,7 +12,7 @@ answers that. It sits beside the four AI features in [`PLAN.md`](PLAN.md) and is
    - Tower: snipers.
    - Bunker: turrets, no heavy guards, a taller space with sniper platforms, stairs up to them, bridges between them,
      ceiling fans and hanging lights.
-   - Shootout exit: lit well (done, see below). Its signature threat is still open.
+   - Shootout exit: lit well (done, see below). Signature threat: riot-shield guards that need a flash grenade to open.
 4. **Bunker heights** (chosen): storey 8 m (today 4 m); sniper platforms and bridges at 6 m, which is two wall heights
    (walls are 3 m).
 5. **Lighting**: the bunker and the shootout exit are lit (cool strip light in the bunker, warm light and every storey
@@ -81,10 +81,21 @@ take it down from behind. Two to four per tower, more at higher job numbers. Use
     and the sight/occlusion boxes. The spike measures that cost first.
   - The AI partner must follow up the platform stairs and across the bridges (see the co-op rules in the plan).
 
-## 5. Shootout exit
+## 5. Shootout exit: riot-shield guards
 
-Lit like the bunker, with all storeys known. Its signature threat is still open (ideas: riot-shield guards that need a
-flash to open, or a waves director that picks the mix per run, which is where the Heist Director can help).
+Lit like the bunker, with all storeys known. The signature threat (chosen) is **riot-shield guards**: they come in the
+waves with the hunters, a shield turns every stun, bullet and EMP aside from the front, and only a **flash grenade** opens
+it, for a few seconds, during which shots count and a takedown from behind works. Shots from the side or behind are not
+turned aside, which rewards moving round them.
+
+- It reuses the shield rules the Warden boss already has (`warden.ts`: the shield, the flash that opens it, the window it
+  stays open), with a riot guard's own numbers: less health, a shorter open window, a frontal arc instead of full cover.
+- The flash grenade is the answer, so waves are paced to restock them (the exit already drops a weapons kit between
+  waves) and the partner learns to throw or call one (see the co-op rules).
+- **Engineering note:** the shield lives in `bots.ts`, one of the files the private original-look build overwrites. The
+  riot profile therefore needs the same edit in the private copy: kept as a small patch applied by
+  `scripts/restore-private-assets.sh`, not edited by hand twice.
+- A later step could let the Heist Director choose each run's wave mix (guards, riot guards, hunters).
 
 ## Constraints that apply to all of it
 
@@ -104,11 +115,11 @@ flash to open, or a waves director that picks the mix per run, which is where th
 |---|---|
 | Phase 2 (Oct 29–30) | Radio check-ins and habit counters (small, pure rules plus glue) |
 | Phase 3 (Oct 31 – Nov 1) | Tower snipers |
+| Phase 4 (Nov 2) | Riot-shield guards in the exit waves (small: the shield rules exist) |
 | After the voice partner and Director v1 are playable | Bunker spike (half a day), then the rebuild, **timeboxed to 2 days**; if the spike or the first day says no, cut to turrets plus a single sniper platform with one stair |
 
 ## Open questions
 
-- The shootout exit's signature threat.
 - Whether snipers should also shoot the AI partner (assumed yes, with a lower hit chance than the player).
 - Bridge width and rail height, and whether the player can drop from a bridge to the floor (assumed yes, with the
   existing drop and landing).
