@@ -16,6 +16,6 @@ for c in crouchIdle crouchWalk crouchLeft crouchRight hide wall; do cp "$ORIG/pu
 OV=private-overlay/src/client/game
 mkdir -p "$OV"
 for f in actor bots highwall outfit player portrait retarget skins stash ual; do cp "$ORIG/src/client/game/$f.ts" "$OV/$f.ts"; done
-# the boss module was renamed in this repo
-sed -i.bak "s#from './rourke'#from './warden'#; s/Rourke/Warden/g; s/rourke/warden/g; s/ROURKE/WARDEN/g" "$OV/bots.ts" && rm "$OV/bots.ts.bak"
+# a module was renamed in this repo: the rules for that are in the git-ignored scripts/private-rename.sed
+[ -f scripts/private-rename.sed ] && sed -i.bak -f scripts/private-rename.sed "$OV/bots.ts" && rm "$OV/bots.ts.bak"
 echo "done. Build the original-look demo with: npm run build:original   (output: dist-original/)"

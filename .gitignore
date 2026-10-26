@@ -11,3 +11,4 @@ dist/
 public/models/private/
 private-overlay/
 dist-original/
+scripts/private-rename.sed

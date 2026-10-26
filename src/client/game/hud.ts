@@ -2332,7 +2332,7 @@ export type ReaderPage = { kicker: string; count: string; title: string; body: s
 let readerEl: HTMLElement | null = null;
 
 /**
- * The file you just took, on a page of its own: the room dims, the text types out, the margin note comes in last, and the job waits until you are done (Enter, Space or Escape:
+ * The file you just took, on a page of its own: the room dims, the text types out, the last note comes in last, and the job waits until you are done (Enter, Space or Escape:
  * the first of those finishes the typing, the next closes it).
  */
 export function showReader(page: ReaderPage, onClose: () => void): void {
