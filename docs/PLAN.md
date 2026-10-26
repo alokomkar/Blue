@@ -122,9 +122,9 @@ Oct 26 is a Monday. Oct 31 and Nov 1 are the weekend (no Meta office hours; offi
 | **0. Setup** | Mon Oct 26 | Repo, docs, accounts | README and plan committed; Meta API key created; credit and partner-credit requests sent when links are live |
 | **1. Foundations and spikes** | Tue Oct 27 – Wed Oct 28 | Baseline in, standalone build live, riskiest unknowns answered | Baseline imported with story stripped and tagged; page deployed on Vercel with a working `/api` proxy; level spec v0 loads a maze; three spikes answered (below) |
 | **Gate G1** | end of Wed Oct 28 | Decide photo-to-map scope | Go / reduced / drop |
-| **2. Voice and Director v1** | Thu Oct 29 – Fri Oct 30 | Two features playable | Five or more partner orders work by voice; Director produces a verified maze from a sentence |
+| **2. Voice and Director v1** | Thu Oct 29 – Fri Oct 30 | Two features playable | Five or more partner orders work by voice; Director produces a verified maze from a sentence; radio check-ins and habit counters in (see [`GAMEPLAY.md`](GAMEPLAY.md)) |
 | **3. Photo to map and repair loop** | Sat Oct 31 – Sun Nov 1 | Third feature, Director repair loop, four-level run order | Sketch to playable map with the verifier; visible repair loop; four levels chain in order |
-| **4. Story layer and exit level** | Mon Nov 2 | Fourth feature, shootout exit | Briefing, dossier art and newspaper generate per run; exit level uses voice orders |
+| **4. Story layer and exit level** | Mon Nov 2 | Fourth feature, shootout exit | Briefing, dossier art and newspaper generate per run; exit level uses voice orders; the bunker rebuild (tall space, sniper platforms, turrets) only if its spike passed, timeboxed to 2 days |
 | **5. Harden and film** | Tue Nov 3 | Demo never fails; rehearsed | Cached fallbacks for every feature; rate limiting and spend alert on; custom domain; demo recorded once |
 | **6. Submit** | Wed Nov 4 | Submission in early | Final video, public repo check, X post, submission filed by **3 PM ET** (deadline 9 PM) |
 | After | Nov 5 – 16 | Judging, ceremony Nov 9 12 PM, community vote result Nov 16 | |
@@ -175,7 +175,15 @@ Cut order if short on time: bunker beat first, then tower, then the repair-loop 
 | One-person scope | High | Scope tiers; ship Must first |
 | Model availability in my region | Unknown | Check the Geographic Use Policy and test with a real key on day 1 |
 
-## 11. Open questions
+## 11. Gameplay track
+
+Playtest feedback (levels feel alike, run and gun, enemies too easy) is answered by a separate, timeboxed track:
+radio check-ins, counters to the player's habits, snipers in the tower, and a taller bunker with sniper platforms,
+bridges and turrets. Details, the chosen heights and the schedule are in [`GAMEPLAY.md`](GAMEPLAY.md). It never
+displaces a Must item. The co-op work (the AI partner on the tower, bunker and exit) and the bunker and exit lighting
+were done on Oct 26, before the building period, and are committed on Oct 27 so history shows them inside the window.
+
+## 12. Open questions
 
 - Subdomain name for the hackathon build.
 - Licence for the repo (decide before the first code commit).
