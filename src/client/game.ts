@@ -74,7 +74,9 @@ import { NO_CARRY, carryOver, describeCarry, easeFor, ladderCarry, mergeCarry, t
 import { CASE_TIERS, caseStrength, communityCarry } from '../shared/case';
 import { CONTRACTS, type ContractId } from '../shared/contracts';
 import { falloutFor, runOutcomeOf, type MissionOutcome } from '../shared/fallout';
-import { contractFor } from './game/contracts';
+import { contractFor, PLAYABLE } from './game/contracts';
+import { BUILD_PHASE, carveAlcoves, clampSpec, enemyPhase, hazardPhase, phaseSeed, specToDifficulty } from '../shared/levelspec';
+import { decodeSpecParam, gridCells, liftFacing, specJob, type SpecJob } from './game/specload';
 import { tonight } from './tonight';
 import { roofHatch, tunnelGrate, withinSteps, facingOut, entriesFor, ENTRIES, ROOF_QUIET_CELLS, type EntryId } from './game/entries';
 import { buildRoofHatch, buildTunnelGrate } from './game/hatches';
@@ -167,7 +169,7 @@ import type { Box3 } from './game/wallfade';
 import { buildYard, type BuiltYard } from './game/yard';
 import { PropFader } from './game/propfade';
 import { towerThemes, dressTowerLevel, buildCameras, furnishPieces, FABRICS, ANNEX_FABRIC, STORE_FABRIC, DEPOT_FABRIC, CORE_FABRIC, type CameraRig, type Destructible, type OfficeDoorRig, type HeistLook } from './game/tower';
-import { activePlan, selectTowerPlan, sectionOf, towerBlocked, startOpening, exitOpening, TOWER_START, TOWER_STAIRS, TOWER_BRIDGES, TOWER_LEVELS, TOWER_COLS, TOWER_ROWS, TOWER_LIFTS, TOWER_PATROLS, TOWER_POSTS, TOWER_DOGS, TOWER_ALPHAS, TOWER_LASERS, TOWER_KEYCARD, TOWER_CARDS, TOWER_BRIDGE_BONUS, STAIR_OPEN_S, ledgeNear, ledgeSpans, type LedgeSpan, OFFICES, levelMap, drawCells, gameStairs, walkable, sightAcross } from './game/towerplan';
+import { activePlan, selectTowerPlan, sectionOf, towerBlocked, startOpening, exitOpening, TOWER_START, TOWER_STAIRS, TOWER_BRIDGES, TOWER_LEVELS, TOWER_COLS, TOWER_ROWS, TOWER_LIFTS, TOWER_PATROLS, TOWER_POSTS, TOWER_DOGS, TOWER_ALPHAS, TOWER_LASERS, TOWER_KEYCARD, TOWER_CARDS, TOWER_BRIDGE_BONUS, STAIR_OPEN_S, ledgeNear, ledgeSpans, type LedgeSpan, OFFICES, levelMap, drawCells, gameStairs, walkable, sightAcross, sniperViewOf, setSniperPosts } from './game/towerplan';
 import { GUN_MENU, gunLabel, gunShort, isBigGun, type BigGun } from './game/bigguns';
 import { shotSound, spawnShot } from './game/projectiles';
 import { BRIDGE_ROW, CANAL_COL, CONTAINER_H, CONTAINER_W, DOCK_ZIPLINE, YARD_CELL, YARD_COLS, YARD_ROWS, YARD_PLANS, type YardPlanData, zipPoint } from './game/yardplan';
@@ -203,6 +205,8 @@ import * as signageText from './game/signage';
 import { textFor } from './game/stacksigns';
 import { containerSigns, roomSigns } from './game/bunkersigns';
 import { buildSigns, type SignLayer } from './game/signrender';
+import { Watch } from './game/watch';
+import { clearRadio } from './game/radiofeed';
 import { BACKUP_DROP_M, CAMERA_BODY_S, SEARCH_EVERY_S, SEARCH_FOR_S, mayCallBackup, pickDropCell, searchCell, DROP_MAX_CELLS, DROP_MIN_CELLS, type DropCandidate } from './game/backup';
 import { cameraYaw, cameraSees, spotMeter, CAMERA_SPOT_S, CAMERA_COOLDOWN_S, CAMERAS_OFF_S } from './game/cameras';
 import { furnitureFor, KINDS, TOWER_SETS, type Placed, type TowerSetId } from './game/towerfurniture';
@@ -210,7 +214,7 @@ import type { Enemy, EnemyContext } from './game/enemies/types';
 import { Watchdog } from './game/enemies/watchdog';
 import { markerFor, pingGap, strongest } from './game/dogwarn';
 import { Blasts } from './game/blasts';
-import { decayedSuspicion, EVASION_S, PHASE_LABEL, QUIET, standsDown, stepAlert, SWEEP_CELLS, SWEEP_EVERY_S, type AlertState } from './game/alertstate';
+import { CAUTION_ON, decayedSuspicion, EVASION_S, PHASE_LABEL, QUIET, standsDown, stepAlert, SWEEP_CELLS, SWEEP_EVERY_S, type AlertState } from './game/alertstate';
 import { approaching, bulletPace, BULLET_AUTO_MIN, BULLET_MIN_START, BULLET_REARM_S, FULL_BULLET, tickBullet, toggleBullet, type BulletState } from './game/bullettime';
 import { insideSmoke } from './game/smoke';
 import { SmokeClouds, spawnThrown, type Thrown } from './game/grenades';
@@ -225,6 +229,9 @@ import { WatchdogPack } from './game/enemies/dogpack';
 import { meetingPoint, PACK_RANGE_CELLS } from './game/enemies/pack';
 import { Crawler } from './game/enemies/crawler';
 import { Alpha, ALPHA_BLAST_R } from './game/enemies/alpha';
+import { Sniper } from './game/enemies/sniper';
+import { planSniperPosts, rngFor, sniperCount } from './game/enemies/sniperposts';
+import { reachable as sniperReach, SNIPER_HIT_SUSPICION } from './game/enemies/sniperaim';
 import { Drone } from './game/enemies/drone';
 import { difficultyFor, MIN_LOG_WINDOW_S, type Difficulty } from './game/difficulty';
 import { buildTrap, sensorBeam, TRAP_RADIUS, MAX_ARMED_TRAPS, type TrapRig } from './game/traps';
@@ -267,7 +274,7 @@ import { DEFAULT_STYLE, HAIRSTYLE_PIECES, SUIT_SHADES, type Style } from './game
 import { planPipes, reachSpots, gripAtTower, gripFacing, hookPoint, pointOnLine, shimmy, towerUnder, turnOnto, PIPE_HEIGHT, type Grip, type PipePlan } from './game/pipes';
 import { GOAL_LABEL, pickBunkerGoal, pickGoal, resolveGoalTarget, stepToward, type Goal } from './game/guide';
 import { generateBuilding } from './game/building';
-import { generateLayout, landmarkOf, inLandmark, stairSpurOf } from './game/layouts';
+import { generateLayout, landmarkOf, inLandmark, stairSpurOf, type LayoutStyle } from './game/layouts';
 import { buildLandmark, type LandmarkSpot } from './game/landmarks';
 import { HIDEOUTS, hideCounts } from './game/hideouts';
 import { WAYS, ENTRY_TITLE, EXIT_NAME, EXIT_SOUND } from './game/ways';
@@ -286,6 +293,8 @@ let forcedLocation: LocationId | null = null;
 /** A Daily Heist run: the day's seed builds the same job for everyone; `scored` is false for practice (a replay, or logged out). */
 /** A Daily Heist run: the scored attempt or practice, what last night carries into it, and how this week's earlier nights went. */
 type DailyRun = { day: string; number: number; seed: number; scored: boolean; carry: Carry; week: RunOutcome[];
+  /** A level built from a spec (`?spec=`, specload.ts) rather than a job number's choices: the place, layout, contract, twists, sizes, counts and maybe the walls are its own. */
+  spec?: SpecJob;
 };
 
 /** A job's settings with last night's carry-over applied (campaign.ts): only what leaves the building itself alone. */
@@ -392,10 +401,11 @@ function dailyBoardView(board: DailyBoard, job: number): Leaderboard {
 }
 const AGENT_KEY = 'mazeHeist.agent';
 const AI_COOP_KEY = 'mazeHeist.aiCoop';
-/** Whether the AI partner comes along on a job (the brief's option, kept in this browser; `?coop=ai` forces it on localhost). */
+/** Whether the AI partner comes along on a job (the brief's option, kept in this browser; `?coop=ai` forces it on localhost, and on any host when the URL is a `?spec=` level). */
 let aiCoopOn = ((): boolean => {
   try {
-    if (/^(localhost|127\.0\.0\.1)$/.test(window.location.hostname) && new URLSearchParams(window.location.search).get('coop') === 'ai') return true;
+    const q = new URLSearchParams(window.location.search);
+    if ((/^(localhost|127\.0\.0\.1)$/.test(window.location.hostname) || q.has('spec')) && q.get('coop') === 'ai') return true;
     return window.localStorage.getItem(AI_COOP_KEY) === '1';
   } catch {
     return false;
@@ -781,6 +791,7 @@ const BODY_CALLS_CELLS = 4; // guards this many cells from a found body come to 
 const BODY_METER_RANGE = 14;
 const CROUCH_HIPS = 0.62; // how high the hips are over the wall top, crouched (Braced Hang To Crouch's last frame)
 const ALPHA_TRACER_COLOR = 0x4fb4ff; // an alpha's shots are blue, apart from a guard's
+const SNIPER_TRACER_COLOR = 0xff3b2e; // a sniper's round is a long red streak down its laser
 const ALPHA_HINT_DIST = 14; // an alpha unit this close says, the first time, what it does and how to stop it
 const MINE_HINT_RANGE = 7; // a crawler mine this close says, the first time, what it is and how to stop it
 const EMP_HINT_RANGE = 9; // a dog or drone this close says, the first time, how to stop one // bodies this close to the player show how visible they are
@@ -1263,7 +1274,9 @@ function populateFloor(
   /** A way in this floor holds (entries.ts): the roof hatch upstairs, the tunnel grate on the ground floor. */
   spot?: { kind: 'hatch' } | { kind: 'grate'; exitDist: number },
   /** The contract's steps (objectives.ts) and which floor this is: their stations go in the big room and along the walls. */
-  objective?: { plan: ObjectivePlan; floor: 0 | 1 } | null
+  objective?: { plan: ObjectivePlan; floor: 0 | 1 } | null,
+  /** Where the agent comes in on this floor: the corner (0, 0), unless a sketch put the lift elsewhere. */
+  start: { x: number; y: number } = { x: 0, y: 0 }
 ): FloorContent {
   const originX = floor.group.position.x;
   const originY = floor.group.position.y;
@@ -1275,6 +1288,7 @@ function populateFloor(
   // ends especially) before leads/bots/crates claim them. Each floor's
   // spawn is its own (0,0): the job start on floor 0, the stair landing on
   // floor 1.
+  if (planSpec) seedRandom(phaseSeed(planSpec.seed, originY > 0 ? BUILD_PHASE.upperSecurity : BUILD_PHASE.groundSecurity)); // (a spec's build: the verifier reseeds here too, shared/levelspec.ts's phaseSeed)
   const plan =
     script?.plan ??
     planSecurity(
@@ -1282,7 +1296,7 @@ function populateFloor(
       cols,
       rows,
       dist,
-      { x: 0, y: 0 },
+      start,
       used,
       {
         doors: diff.doors,
@@ -1310,6 +1324,9 @@ function populateFloor(
   }
   // The ceiling's pipes and the towers up to them (pipes.ts), on every job: the towers take their dead ends before
   // crates, lockers and the rest do, and only where no locked door seals them off.
+  if (planSpec) seedRandom(phaseSeed(planSpec.seed, (originY > 0 ? 500 : 501))); // (the ceiling's towers take cells too: from a seed of their own, whatever the rooms' placing drew)
+  /** A spec's build: each placement from its own seed, so what building the one before drew cannot move the next (the verifier reseeds at the same points, shared/levelspec.ts). */
+  const reseedHazard = (k: number): void => (planSpec ? seedRandom(phaseSeed(planSpec.seed, hazardPhase(originY > 0, k))) : undefined);
   const basePipes = script ? (script.pipes ?? null) : diff.pipes ? planPipes(cells, cols, rows, dist, used, 2, (x, y) => plan.section[y]?.[x] === -1) : null;
   // A pipe over every records room, the uplink and the log room too, so a grapple line can be lowered onto their consoles.
   const pipePlan =
@@ -1413,6 +1430,7 @@ function populateFloor(
   };
   if (objective && !script) {
     const mine = objective.plan.steps.filter((st) => st.floor === objective.floor && st.kind !== 'keycard');
+    reseedHazard(10);
     const wall = placeStaffLockers(cells, cols, rows, used, mine.length + 1).map((w): StationPlacement => {
       const [dx, dz] = DIR_DELTA[w.wall];
       const back = CELL / 2 - WALL_T / 2 - 0.4;
@@ -1482,7 +1500,10 @@ function populateFloor(
   // The job's patrol guards, each a good walk (SPAWN_MIN_CELLS) from the floor's own spawn
   // cell and from each other — placeBotSpawn reserves its cell in `used`
   // each call, so repeated calls don't overlap.
+  let spawnNo = 0;
+  const reseedSpawn = (): void => (planSpec ? seedRandom(phaseSeed(planSpec.seed, enemyPhase(originY > 0, spawnNo++))) : undefined); // (a spec's build: each enemy from its own seed, so what building the one before drew cannot move the next)
   for (let i = 0; randomEnemies && i < diff.guards; i++) {
+    reseedSpawn();
     const botSpawn = placeBotSpawn(cols, rows, dist, used);
     if (botSpawn) enemies.push(new Bot(root.scene, botSpawn.x * CELL + originX, botSpawn.y * CELL + originZ, originX, originY, originZ, patrolProfile()));
   }
@@ -1508,6 +1529,7 @@ function populateFloor(
     carrier = (enemies.find((e) => e instanceof Bot && e.kind === 'patrol') as Bot | undefined) ?? null;
     if (!carrier) {
       const desk = objective.plan.steps.find((st) => st.kind === 'keycard');
+      reseedHazard(11);
       const w = desk ? placeStaffLockers(cells, cols, rows, used, 1)[0] : undefined;
       if (desk && w) {
         const [dx, dz] = DIR_DELTA[w.wall];
@@ -1531,18 +1553,21 @@ function populateFloor(
 
   // Crawler mines lie dormant in the corridors.
   for (let i = 0; randomEnemies && i < diff.crawlers; i++) {
+    reseedSpawn();
     const spawn = placeBotSpawn(cols, rows, dist, used);
     if (spawn) enemies.push(new Crawler(root.scene, spawn.x * CELL + originX, spawn.y * CELL + originZ, originX, originY, originZ));
   }
 
   // Alpha units prowl too: they hunt by ear and by scent, howl, run you down and go off (alpha.ts).
   for (let i = 0; randomEnemies && i < diff.alphas; i++) {
+    reseedSpawn();
     const spawn = placeBotSpawn(cols, rows, dist, used);
     if (spawn) enemies.push(new Alpha(root.scene, spawn.x * CELL + originX, spawn.y * CELL + originZ, originX, originY, originZ));
   }
 
   // Drones sweep the floor from above the walls.
   for (let i = 0; randomEnemies && i < diff.drones; i++) {
+    reseedSpawn();
     const spawn = placeBotSpawn(cols, rows, dist, used);
     if (spawn) enemies.push(new Drone(root.scene, spawn.x * CELL + originX, spawn.y * CELL + originZ, originX, originY, originZ, cols, rows));
   }
@@ -1553,6 +1578,7 @@ function populateFloor(
   const dogs: Watchdog[] = [];
   let packGround: number[][] | null = null; // walking distance from the first dog: the rest start a few cells off, on ground it can reach
   for (let i = 0; randomEnemies && i < diff.watchdogs; i++) {
+    reseedSpawn();
     const near = packGround;
     const spawn = (near && placeBotSpawn(cols, rows, dist, used, (x, y) => near[y]![x]! >= 3 && near[y]![x]! <= PACK_RANGE_CELLS)) ?? placeBotSpawn(cols, rows, dist, used);
     if (!spawn) continue;
@@ -1587,6 +1613,7 @@ function populateFloor(
   // Each place leans on a different way to hide a body: how many of each kind a floor has, and what each is (hideouts.ts).
   const hide = HIDEOUTS[planPlace ?? 'campus'];
   const hideN = hideCounts(diff, hide);
+  reseedHazard(0);
   const hidingSpots = script?.crates ?? placeHidingSpots(cols, rows, dist, used, hideN.crates);
   const crates: CratePairRig[] = [];
   for (const spot of hidingSpots) {
@@ -1601,6 +1628,7 @@ function populateFloor(
   // floor.wallBoxes (lasers.ts) since a bot's own line of sight and the
   // torch's floor-reveal shouldn't be blocked by a thin beam the way they
   // are by a real wall — player.ts's tick() checks these on its own.
+  reseedHazard(1);
   const laserTraps = script?.lasers ?? placeLaserTraps(cols, rows, cells, dist, used, diff.lasers);
   const laserBoxes: WallBox[] = [];
   for (const t of laserTraps) {
@@ -1608,18 +1636,21 @@ function populateFloor(
     laserBoxes.push(offsetBox(laserTrapBox(t), originX, originZ));
   }
   // Moving lasers, on later jobs: they catch you rather than block you (the game loop's tickMovingLasers).
+  reseedHazard(2);
   const sweepers = (script ? (script.sweepers ?? []) : placeSweepers(cells, cols, rows, dist, used, diff.sweepers)).map((laser) => {
     const rig = buildSweeperMesh(laser);
     // Its post stands in the middle of the junction, right where you walk: it doesn't block (you'd jam on it head-on).
     floor.group.add(rig.group);
     return { laser, rig };
   });
+  reseedHazard(3);
   const sliders = (script ? (script.sliders ?? []) : placeSliders(cells, cols, rows, dist, used, diff.sliders, 4, diff.fastSliders)).map((laser) => {
     const rig = buildSliderMesh(laser);
     floor.group.add(rig.group);
     return { laser, rig };
   });
   // Line lasers (linelasers.ts): single beams that rise and fall or sweep across a corridor, from job 2.
+  reseedHazard(4);
   const lines = (script ? (script.lines ?? []) : placeLines(cells, cols, rows, dist, used, diff.lines, diff.lineSize)).map((laser) => {
     const rig = buildLineMesh(laser);
     floor.group.add(rig.group);
@@ -1627,12 +1658,14 @@ function populateFloor(
   });
   // Laser gates (evade.ts): beams a cloak does nothing about, on every job. An extraction can't offer a crawl (the specimen keeps your hands full).
   const gateKinds: GateKind[] = objective?.plan.contract === 'extract' ? ['duck', 'pulse'] : ['duck', 'crawl', 'pulse'];
+  reseedHazard(5);
   const gates = (script ? (script.gates ?? []) : placeGates(cells, cols, rows, dist, used, diff.gates, gateKinds)).map((gate) => {
     const rig = buildGateMesh(gate);
     floor.group.add(rig.group);
     return { gate, rig };
   });
   // Timed shutters, on later jobs: shut to everything until a panel's hacked, and never open to guards.
+  reseedHazard(6);
   const shutters: Shutter[] = (script ? (script.shutters ?? []) : placeShutters(cells, cols, rows, dist, used, diff.shutters)).map((plan) => {
     const rig = buildShutter(plan);
     floor.group.add(rig.group);
@@ -1643,6 +1676,7 @@ function populateFloor(
   });
 
   // Staff lockers to hide in, and vents that short-cut a long way round.
+  reseedHazard(12);
   const staffLockers = (script?.staffLockers ?? placeStaffLockers(cells, cols, rows, used, hideN.staffLockers)).map((spot) => {
     const rig = buildStaffLocker(spot.x, spot.y, spot.wall, script ? undefined : hide.locker);
     floor.group.add(rig.group);
@@ -1655,6 +1689,7 @@ function populateFloor(
   const consoleCells = [...stations.map((st) => ({ x: Math.round(st.rig.stand.x / CELL), y: Math.round(st.rig.stand.z / CELL) })), ...terminals.map((t) => ({ x: Math.round(t.x / CELL), y: Math.round(t.z / CELL) }))];
   const hoverPipes = pipePlan && !script ? reachSpots(pipePlan, consoleCells, cols, rows) : pipePlan;
   const pipeRig = hoverPipes ? buildPipes(floor.group, hoverPipes, CELL, TALL_FLOOR_HEIGHT, floor.wallBoxes, { x: originX, z: originZ }) : null;
+  reseedHazard(13);
   const vents = (script ? [] : placeVents(cells, cols, rows, plan.section, used, hideN.vents)).map((v) => {
     const a = buildVentGrille(v.a.x, v.a.y, v.side, hide.vent);
     const b = buildVentGrille(v.b.x, v.b.y, OPPOSITE[v.side], hide.vent);
@@ -1674,6 +1709,7 @@ function populateFloor(
   if (lingers.length > 0) for (const e of enemies) if (e instanceof Bot && e.kind === 'patrol') e.setLingers(lingers);
 
   // Last, so clutter only goes in cells nothing else claimed.
+  reseedHazard(14);
   const clutter = decorateFloor({ rig: floor, cells, cols, rows, used, doors: plan.doors, rooms: plan.rooms, lasers: laserTraps, routeTarget: route.target, routeLabel: route.label, lifts, plain: script?.plain === true });
   for (const c of clutter) floor.wallBoxes.push(offsetBox(c.box, originX, originZ));
   const props = clutter.map((c) => ({ ...c, worldX: c.x + originX, worldZ: c.z + originZ, disabled: false }));
@@ -1684,7 +1720,10 @@ function populateFloor(
   // there's nothing to aim at and guards see less far) and room lights alike. Lasers keep their own glow.
   const dark = Array.from({ length: rows }, () => new Array<boolean>(cols).fill(false));
   if (script) for (const c of script.dark ?? []) dark[c.y]![c.x] = true;
-  else planBlackouts(cells, cols, rows, dist, diff.blackouts, diff.blackoutCells).forEach((row, y) => row.forEach((d, x) => (dark[y]![x] = d)));
+  else {
+    reseedHazard(15);
+    planBlackouts(cells, cols, rows, dist, diff.blackouts, diff.blackoutCells).forEach((row, y) => row.forEach((d, x) => (dark[y]![x] = d)));
+  }
   floor.group.updateMatrixWorld(true);
   const at = new THREE.Vector3();
   const lamps: Lamp[] = [];
@@ -1742,6 +1781,7 @@ function populateFloor(
       if (roomLamps.length && wall) fit('switch', buildLightSwitch(x, y, wall), { x, y }, roomLamps);
     }
     if (diff.breakers > 0) {
+      reseedHazard(16);
       const plan = planCircuits(cells, cols, rows, diff.breakers);
       circuit = plan.circuit;
       plan.seeds.forEach((seed, k) => {
@@ -2251,11 +2291,13 @@ const ROOM_HUES: Partial<Record<RoomKind, number>> = { terminal: 0x35d27a, serve
 let layoutStyle: 'building' | 'maze' = 'building';
 /** The place the job being built is in, so its floors take that place's layouts (layouts.ts): each place has its own shape, and a big open room. */
 let planPlace: LocationId | null = null;
+/** The spec the job being built is from, if it is (the layout it asks for is both floors'). */
+let planSpec: SpecJob | null = null;
 const freshPlan = (cols: number, rows: number, floor = 0): MazeCells => {
-  if (layoutStyle === 'maze') return generateMaze(cols, rows);
+  if (planSpec?.layout === 'maze' || (!planSpec && layoutStyle === 'maze')) return generateMaze(cols, rows);
   if (!planPlace) return generateBuilding(cols, rows);
   const place = LOCATIONS[planPlace];
-  return generateLayout(place.layouts[floor === 0 ? 0 : 1], cols, rows, place.landmark, generateBuilding);
+  return generateLayout(planSpec ? (planSpec.layout as LayoutStyle) : place.layouts[floor === 0 ? 0 : 1], cols, rows, place.landmark, generateBuilding);
 };
 /** The floor plans laid out as the building was rebuilt after a catch (takeover.ts), in the order the floors are built, for the retry to be built from. */
 let pendingPlans: Array<{ cols: number; rows: number; cells: MazeCells }> = [];
@@ -2371,6 +2413,8 @@ applyControls(controlSettings);
 
 function startJob(n: number, course: Course | null = null, dailyRun: DailyRun | null = null, entry: EntryId = 'dock', approach: Approach | null = null): void {
   signageText.resetTags(n); // (the guards' and dogs' serial numbers start again, the same for the same job)
+  const fromSpec = dailyRun?.spec ?? null; // a level from a spec (specload.ts)
+  planSpec = fromSpec;
   const training = course !== null;
   const grapple = course === 'grapple';
   const stealth = course === 'stealth';
@@ -2495,7 +2539,7 @@ function startJob(n: number, course: Course | null = null, dailyRun: DailyRun | 
   const stations = range ? RANGE_STATIONS : stackExit || yardExit ? outStations() : bunker ? bunkerStations(() => activeFloorIdx) : tower ? (exitMode ? EXIT_STATIONS : TOWER_STATIONS) : dock ? DOCK_STATIONS : highwall ? HIGHWALL_STATIONS : wall ? WALL_STATIONS : corners ? CORNERS_STATIONS : cover ? COVER_STATIONS : weapons ? WEAPONS_STATIONS : stealth ? STEALTH_STATIONS : grapple ? GRAPPLE_STATIONS : ceiling ? CEILING_STATIONS : STATIONS;
   level = n;
   if (!training && !dailyRun) ladderJob = n;
-  hud.setJobLabel(levelName ? { name: levelName } : training ? 'training' : dailyRun ? { daily: dailyRun.number } : level);
+  hud.setJobLabel(levelName ? { name: levelName } : training ? 'training' : fromSpec ? { name: fromSpec.title } : dailyRun ? { daily: dailyRun.number } : level);
   notePlayed();
   hud.setCoach(null);
 
@@ -2538,13 +2582,16 @@ function startJob(n: number, course: Course | null = null, dailyRun: DailyRun | 
   const seedParam = new URLSearchParams(location.search).get('seed');
   const towerSeed = dailyRun ? dailyRun.seed : seedParam !== null && Number.isFinite(Number(seedParam)) ? Math.floor(Number(seedParam)) : Math.floor(Math.random() * 1_000_000_000);
   if (tower) selectTowerPlan(towerSetId, towerSeed);
+  // The tower's snipers (enemies/sniperposts.ts): their posts are worked out from the plan itself (the same for the same plan) before the furniture is laid out, which keeps clear of them; the exit level has none.
+  if (tower) setSniperPosts(activePlan(), planSniperPosts(sniperViewOf(activePlan()), rngFor(towerSeed, towerSetId)));
   const layout = training ? parseTraining(bunker ? bunkerMap(0, false) : tower ? levelMap(0) : range ? RANGE_MAP : dock ? DOCK_MAP : highwall ? HIGHWALL_MAP : wall ? WALL_MAP : corners ? CORNERS_MAP : cover ? COVER_MAP : weapons ? WEAPONS_MAP : stealth ? STEALTH_MAP : grapple ? GRAPPLE_MAP : ceiling ? CEILING_MAP : TRAINING_MAP) : null;
   const script = layout ? (bunker ? bunkerScript(layout, 0) : tower ? towerScript(layout, 0, towerSetId, exitMode) : range ? rangeScript(layout) : dock ? dockScript(layout, yardPlan) : highwall ? highwallScript(layout) : wall ? wallScript(layout) : corners ? cornersScript(layout) : cover ? coverScript(layout) : weapons ? weaponsScript(layout) : stealth ? stealthScript(layout) : grapple ? grappleScript(layout) : ceiling ? ceilingScript(layout) : trainingScript(layout)) : undefined;
   // A daily heist is built like the campaign's job of the same number (with last night's carry-over).
   // What the last mission carries in: last night's, for a daily; the last job cleared, on the ladder.
   const carryIn: Carry | null = dailyRun ? dailyRun.carry : training ? null : ladderCarryNow(level);
   hud.resetToasts();
-  const baseDiff = withCarry(difficultyFor(level), carryIn);
+  clearRadio(); // (the guards' radio feed starts empty, too)
+  const baseDiff = fromSpec ? specToDifficulty(fromSpec.spec, { ...withCarry(difficultyFor(level), carryIn), newThisJob: null }) : withCarry(difficultyFor(level), carryIn);
   // A daily heist is built from the day's seed, so it's the same building for everyone (seeded.ts) — from the maze
   // through every room, guard and blackout, up to the ambient effects below.
   if (dailyRun) seedRandom(dailyRun.seed);
@@ -2555,20 +2602,20 @@ function startJob(n: number, course: Course | null = null, dailyRun: DailyRun | 
   // (The bunker is dressed as a place: the lab first; `?place=` on localhost picks another.)
   const bunkerPlace: TowerSetId = stackSite ? SITE_PLACE[stackSite] : options.bunkerPlace;
   // (A maze job the run is at is held in the dossier's place; a looked-at one, `?loc=`, in that. Not the Daily, which is everyone's.)
-  const heldIn: LocationId | null = forcedLocation ?? (dailyRun || training ? null : options.mazePlace);
+  const heldIn: LocationId | null = fromSpec?.place ?? forcedLocation ?? (dailyRun || training ? null : options.mazePlace);
   const place = tower ? placed(towerSetId) : bunker ? placed(bunkerPlace) : dock ? (farmSite ? LOCATIONS.refinery : LOCATIONS.warehouse) : training ? LOCATIONS.campus : heldIn ? placed(heldIn) : locationFor(level);
   planPlace = place.id;
   /** What this job asks of the player (contracts.ts): records, or a contract of the place's own (objectives.ts). */
-  const contract: ContractId = training ? 'records' : contractFor(level, place.id);
+  const contract: ContractId = training ? 'records' : fromSpec ? fromSpec.contract : contractFor(level, place.id);
   // The job's twist(s) (twists.ts): the campaign deals one from the fourth job on, a Daily two from its seed. Localhost: `?twist=lockdown,timer` forces them.
   const forcedTwists = ((window as unknown as { __twists?: string[] }).__twists ?? (/^(localhost|127\.0\.0\.1)$/.test(window.location.hostname) ? (new URLSearchParams(window.location.search).get('twist') ?? '').split(',') : [])).filter((t): t is TwistId => (TWIST_IDS as readonly string[]).includes(t));
-  const twists: TwistId[] = training ? [] : forcedTwists.length ? forcedTwists : dailyRun ? dailyTwists(Math.random, contract) : storyTwist(level, contract);
+  const twists: TwistId[] = training ? [] : fromSpec ? fromSpec.twists : forcedTwists.length ? forcedTwists : dailyRun ? dailyTwists(Math.random, contract) : storyTwist(level, contract);
   const forcedSide = (((window as unknown as { __side?: string }).__side ?? (/^(localhost|127\.0\.0\.1)$/.test(window.location.hostname) ? new URLSearchParams(window.location.search).get('side') : null)) ?? '') as SideGoalId;
-  const sideGoal: SideGoalId | null = training ? null : (SIDE_GOAL_IDS as readonly string[]).includes(forcedSide) ? forcedSide : dailyRun ? dailySideGoal(Math.random, twists) : storySideGoal(level, twists);
+  const sideGoal: SideGoalId | null = training ? null : (SIDE_GOAL_IDS as readonly string[]).includes(forcedSide) ? forcedSide : fromSpec ? dailySideGoal(() => fromSpec.sideRoll, twists) : dailyRun ? dailySideGoal(Math.random, twists) : storySideGoal(level, twists);
   const twisted = applyTwists(baseDiff, twists);
   /** A silent night (twists.ts): no guards, sentries, heavies, mines or drones, only dogs listening, on a smaller floor for the slower pace. */
   const silent = twists.includes('silent');
-  const { cols, rows } = layout ?? (silent ? { cols: Math.min(baseDiff.cols, SILENT_MAX_COLS), rows: Math.min(baseDiff.rows, SILENT_MAX_ROWS) } : baseDiff);
+  const { cols, rows } = layout ?? (silent && !fromSpec?.grid ? { cols: Math.min(baseDiff.cols, SILENT_MAX_COLS), rows: Math.min(baseDiff.rows, SILENT_MAX_ROWS) } : baseDiff); // (a sketch's walls are not shrunk)
   const diff = {
     ...baseDiff,
     guards: twisted.guards,
@@ -2578,14 +2625,15 @@ function startJob(n: number, course: Course | null = null, dailyRun: DailyRun | 
     trapsAtStart: twisted.trapsAtStart,
     ...(silent ? { silent: true, heavies: 0, crawlers: 0, alphas: 0, drones: 0 } : {}),
   };
-  const cells = layout?.cells ?? floorPlan(cols, rows, 0);
+  const sketch = fromSpec?.grid ?? null; // the walls a photo gave: they replace the generated plan, and the way in and out are where it put them
+  const cells = layout?.cells ?? (sketch ? gridCells(sketch) : floorPlan(cols, rows, 0));
   // (A tower's plan says where: its street door can be anywhere along the north or west wall.)
-  const startCell: { x: number; y: number } = tower ? { x: TOWER_START.x, y: TOWER_START.y } : bunker ? { x: BUNKER_START.x, y: BUNKER_START.y } : { x: 0, y: 0 };
+  const startCell: { x: number; y: number } = tower ? { x: TOWER_START.x, y: TOWER_START.y } : bunker ? { x: BUNKER_START.x, y: BUNKER_START.y } : sketch ? { x: sketch.start.x, y: sketch.start.y } : { x: 0, y: 0 };
   // The exit is never in the landmark: that is a big open room, not a dead end for a lift.
   const landmark0 = landmarkOf(cells);
   // Nor is it in the stair's spur, where the way up goes (layouts.ts).
   const spur0 = stairSpurOf(cells);
-  const { x: exitX, y: exitY, dist } = layout ? { ...(bunker ? BUNKER_EXIT : layout.marks.X!), dist: bfs(cells, cols, rows, startCell.x, startCell.y) } : farthestCell(cells, cols, rows, 0, 0, (x, y) => !inLandmark(landmark0, x, y) && !spur0?.some((c) => c.x === x && c.y === y));
+  const { x: exitX, y: exitY, dist } = layout ? { ...(bunker ? BUNKER_EXIT : layout.marks.X!), dist: bfs(cells, cols, rows, startCell.x, startCell.y) } : sketch ? { x: sketch.exit.x, y: sketch.exit.y, dist: bfs(cells, cols, rows, startCell.x, startCell.y) } : farthestCell(cells, cols, rows, 0, 0, (x, y) => !inLandmark(landmark0, x, y) && !spur0?.some((c) => c.x === x && c.y === y));
 
   const root = buildSceneRoot(canvas);
   setGrade(root.postfx, place.id); // the place's colour grade (postfx.ts)
@@ -2597,8 +2645,8 @@ function startJob(n: number, course: Course | null = null, dailyRun: DailyRun | 
   // of its own. A doorway means the start cell's outer wall is left out of the plan the floor is drawn from (not the one the game plays on), and the doorway
   // built into the gap.
   // The yard's way in is a gate in the fence, and its way out a truck backed up to it.
-  const ways = dock ? { entry: 'gate' as const, exit: 'truck' as const } : bunker ? { entry: 'lift' as const, exit: 'lift' as const } : WAYS[place.id];
-  const entryDir: Dir = tower ? startOpening(startCell, TOWER_COLS, TOWER_ROWS) : cells[0]![0]!.S ? 'S' : 'E';
+  const ways = dock ? { entry: 'gate' as const, exit: 'truck' as const } : bunker ? { entry: 'lift' as const, exit: 'lift' as const } : sketch ? { ...WAYS[place.id], entry: 'lift' as const } : WAYS[place.id]; // (a sketch's start is not on the outer wall, where a doorway would go)
+  const entryDir: Dir = tower ? startOpening(startCell, TOWER_COLS, TOWER_ROWS) : sketch ? liftFacing(cells, startCell.x, startCell.y) : cells[0]![0]!.S ? 'S' : 'E';
   // (The tower's floors are drawn as a plain hall: no walls round what is not floor, towerplan.ts.)
   // (The bunker's ducts are drawn as corridors, but the guards' map keeps them shut: nobody but the agent crawls in.)
   const baseCells = tower ? drawCells(0) : bunker ? parseTraining(bunkerMap(0, true)).cells : cells;
@@ -2667,8 +2715,8 @@ function startJob(n: number, course: Course | null = null, dailyRun: DailyRun | 
   // in the farthest dead end, facing that dead end's only opening. Both
   // keep their doors shut — solid — until they open.
   const openDir = (x: number, y: number): 'N' | 'S' | 'E' | 'W' => (['S', 'E', 'N', 'W'] as const).find((d) => cells[y]![x]![d]) ?? 'S';
-  const arrival = ways.entry === 'lift' ? buildElevator(startCell.x, startCell.y, tower ? entryDir : cells[0]![0]!.E ? 'E' : 'S') : buildEntryPortal(ways.entry, startCell.x, startCell.y, entryDir);
-  const exitOpens = tower ? exitOpening({ x: exitX, y: exitY }, cols, rows) : bunker ? ((['S', 'E', 'N', 'W'] as const).find((d) => parseTraining(bunkerMap(BUNKER_EXIT_LEVEL, false)).cells[exitY]![exitX]![d]) ?? 'S') : openDir(exitX, exitY);
+  const arrival = ways.entry === 'lift' ? buildElevator(startCell.x, startCell.y, tower || sketch ? entryDir : cells[0]![0]!.E ? 'E' : 'S') : buildEntryPortal(ways.entry, startCell.x, startCell.y, entryDir);
+  const exitOpens = tower ? exitOpening({ x: exitX, y: exitY }, cols, rows) : sketch ? liftFacing(cells, exitX, exitY) : bunker ? ((['S', 'E', 'N', 'W'] as const).find((d) => parseTraining(bunkerMap(BUNKER_EXIT_LEVEL, false)).cells[exitY]![exitX]![d]) ?? 'S') : openDir(exitX, exitY);
   const exitLift =
     ways.exit === 'doors'
       ? buildExitDoors(exitX, exitY, exitOpens)
@@ -2682,7 +2730,7 @@ function startJob(n: number, course: Course | null = null, dailyRun: DailyRun | 
     floor0.group.add(lift.group);
     floor0.wallBoxes.push(...lift.boxes, lift.doorBox);
   }
-  if (ways.entry === 'lift') arrival.setState('arrival', training ? (levelName ? `▼ ${levelName.toUpperCase()}` : '▼ TRAINING') : dailyRun ? `▼ DAILY #${dailyRun.number}` : approach ? '▼ FROM THE TOWER' : `▼ JOB ${level}`);
+  if (ways.entry === 'lift') arrival.setState('arrival', training ? (levelName ? `▼ ${levelName.toUpperCase()}` : '▼ TRAINING') : fromSpec ? `▼ ${fromSpec.title.slice(0, 22).toUpperCase()}` : dailyRun ? `▼ DAILY #${dailyRun.number}` : approach ? '▼ FROM THE TOWER' : `▼ JOB ${level}`);
   exitLift.setState('locked');
   /** Opens or shuts a lift, keeping its doorway's collision box in step. */
   /** The floor the way out stands on: the ground floor of the bunker, the first floor otherwise. */
@@ -2885,6 +2933,12 @@ function startJob(n: number, course: Course | null = null, dailyRun: DailyRun | 
     if (!pick) return;
     partnerCooldown = BACKUP_COOLDOWN_S; // held for the beat before the shot
     window.setTimeout(() => !signal.aborted && !caught && !cleared && partnerShoot(pick), 350);
+  }
+
+  /** The partner as a sniper sees it (enemies/types.ts): null while it is down, gone, or not on the agent's storey. */
+  function partnerMark(): NonNullable<EnemyContext['partner']> | null {
+    if (!partner || partnerState !== 'free' || partnerBlink || partnerFloor() !== storeys[activeFloorIdx]) return null;
+    return { x: partner.worldX, z: partner.worldZ, y: partner.worldY, prone: partner.prone, crouched: partnerCover !== null && partnerCoverReady, hidden: camoConceals(camo.active, player.moving) };
   }
 
   function partnerGoesDown(): void {
@@ -3582,6 +3636,7 @@ function startJob(n: number, course: Course | null = null, dailyRun: DailyRun | 
   // Every stair takes two cells, so the climb is a gentle 27° (41° on a tall floor) rather than a 45° one; if there's nowhere for a straight two-cell run, a steep single cell.
   const floorHeight = bunker || (layout ? script?.pipes : diff.pipes) ? TALL_FLOOR_HEIGHT : FLOOR_HEIGHT;
   // One floor on the first job (difficulty.ts's floors), and in training.
+  if (fromSpec) seedRandom(phaseSeed(fromSpec.seed, BUILD_PHASE.stair));
   const upstairs = !layout && diff.floors > 1;
   const longStair = upstairs ? placeStair(cols, rows, cells, dist, used, 2, spur0?.[0]) : null;
   const stairCell = upstairs ? (longStair ?? placeStair(cols, rows, cells, dist, used)) : null;
@@ -3617,6 +3672,7 @@ function startJob(n: number, course: Course | null = null, dailyRun: DailyRun | 
     root.scene.add(buildStairMesh(stair, CELL));
 
     const { cols: cols1, rows: rows1 } = diff;
+    if (fromSpec) seedRandom(phaseSeed(fromSpec.seed, BUILD_PHASE.upperPlan));
     const cells1 = floorPlan(cols1, rows1, 1);
     // The stairwell doorway: generateMaze never connects row 0 northward or
     // column 0 westward (there's no neighbor there), so that boundary wall
@@ -3661,12 +3717,13 @@ function startJob(n: number, course: Course | null = null, dailyRun: DailyRun | 
     floor1Content || objective ? ['uplink'] : ['uplink', 'logs'],
     { target: { x: exitX, y: exitY }, label: 'EXIT' },
     [
-      { x: 0, y: 0 },
+      { x: startCell.x, y: startCell.y },
       { x: exitX, y: exitY },
     ],
     script,
     layout ? undefined : { kind: 'grate', exitDist: dist[exitY]![exitX]! },
-    objective ? { plan: objective, floor: 0 } : null
+    objective ? { plan: objective, floor: 0 } : null,
+    startCell
   );
 
   // Training gates: a door at the end of each station, opened as it's done.
@@ -3713,6 +3770,8 @@ function startJob(n: number, course: Course | null = null, dailyRun: DailyRun | 
       const everything = new Set<string>();
       for (let y = 0; y < TOWER_ROWS; y++) for (let x = 0; x < TOWER_COLS; x++) everything.add(`${x},${y}`);
       const content = populateFloor(root, rig, upper.cells, TOWER_COLS, TOWER_ROWS, bfs(upper.cells, TOWER_COLS, TOWER_ROWS, start.x, start.y), everything, diff, 0, [], { target: start, label: 'STAIRS' }, [], towerScript(upper, l, towerSetId, exitMode), undefined, null);
+      // The snipers on this storey: as many of the plan's ranked posts as the job calls for (2, then 3 from job 3, 4 from job 6), each on its post facing along its lane.
+      if (!exitMode) for (const sp of activePlan().snipers.slice(0, sniperCount(n))) if (sp.level === l) content.enemies.push(new Sniper(root.scene, sp.x * CELL, sp.y * CELL, rig.group.position.y, sp.facing, sp.x * 1.7 + sp.y * 2.3, rngFor(towerSeed + sp.x * 31 + sp.y * 17 + l, 'roll')));
       storeys.push({ rig, content, explored: freshExplored(TOWER_COLS, TOWER_ROWS) });
     }
     stairs.push(...gameStairs(floorHeight));
@@ -6724,6 +6783,7 @@ function startJob(n: number, course: Course | null = null, dailyRun: DailyRun | 
     const floor = storeys[Math.min(trap.floorIdx, storeys.length - 1)]!;
     const at = new THREE.Vector3(trap.x, floor.rig.group.position.y + 0.3, trap.z);
     const inRange = floor.content.enemies.filter((e) => !e.disabled && Math.hypot(e.worldX - trap.x, e.worldZ - trap.z) <= TRAP_RADIUS);
+    watch.empDischarge(trap.floorIdx);
     const downed = inRange.filter((e) => e.hit('emp') === 'disabled');
     for (const e of downed) enemyDown(e, new THREE.Vector3(e.worldX, e.floorY + 0.6, e.worldZ));
     trapKills += downed.length;
@@ -6854,6 +6914,7 @@ function startJob(n: number, course: Course | null = null, dailyRun: DailyRun | 
     }
     camo = next;
     sound.play(camo.active ? 'camoOn' : 'camoOff');
+    if (camo.active) watch.noteCamo();
   }
 
   /** What a carried body at (lx, lz) on `active` could be put away in, if anything's close: a staff locker, a pair of crates or a vent. Furniture and records lockers don't count: a body won't fit behind a desk or between the shelves. */
@@ -11243,6 +11304,66 @@ function startJob(n: number, course: Course | null = null, dailyRun: DailyRun | 
     }
   }
 
+  // ---- the guards' radio and the counters to the player's habits (radio.ts, habits.ts, watch.ts) ----
+  const watch = new Watch({
+    seed: (dailyRun ? dailyRun.seed : tower ? towerSeed : bunker || hunt ? runSeed : 7919 * level + 13) >>> 0,
+    enabled: !(training && levelName === null) && !exitMode && !(dock && reverseOut),
+    floorCount: () => storeys.length,
+    floor: (i) => {
+      const f = storeys[i]!;
+      return { enemies: f.content.enemies, nav: f.content.navCells, cols: f.content.cols, rows: f.content.rows, origin: { x: f.rig.group.position.x, z: f.rig.group.position.z }, dark: f.content.dark, powerCut: f.content.powerCut };
+    },
+    activeFloor: () => activeFloorIdx,
+    onFloor: () => !caught && !cleared && !aloft && Math.abs(player.worldY - activeFloorIdx * floorHeight) <= 1.5,
+    player: () => ({ x: player.worldX, z: player.worldZ }),
+    now: () => stats.seconds,
+    bodyFound: (b) => bodies.get(b)?.found === true,
+    escalate: () => {
+      // The second missed check-in: where the building has rungs, up one (caution, then the alarm); where it has a health bar or the alarm is already up, every free guard comes.
+      if (healthMode || alarmOn) return 'ALL UNITS CONVERGE';
+      const to = suspicion >= CAUTION_ON ? ALARM_ON : CAUTION_ON;
+      suspicion = Math.max(suspicion, to);
+      hud.setSuspicion(suspicion);
+      return to === ALARM_ON ? 'ALARM RAISED' : 'CAUTION RAISED';
+    },
+    hiding: () => {
+      const here = { x: player.worldX, z: player.worldZ, floor: activeFloorIdx };
+      if (hiddenIn) return { x: (hiddenIn.rig.box.minX + hiddenIn.rig.box.maxX) / 2 + hiddenIn.floor.rig.group.position.x, z: (hiddenIn.rig.box.minZ + hiddenIn.rig.box.maxZ) / 2 + hiddenIn.floor.rig.group.position.z, floor: activeFloorIdx };
+      const o = currentFloor().rig.group.position;
+      return isPlayerHidden(currentFloor().content.hidingSpots, player.worldX - o.x, player.worldZ - o.z) || underFurniture() ? here : null;
+    },
+    nearCorner: () => cornerSpotNear(currentFloor().rig.wallBoxes, player.worldX, player.worldZ) !== null,
+    lane: () => {
+      if (aloft || hiddenIn || ventTransit || stashing || arrivalPhase !== 'done' || inCover || Math.abs(player.worldY - activeFloorIdx * floorHeight) > 0.3) return null;
+      // (Every run starts, and in the maze ends, at the lift: that doorstep is not a route they chose.)
+      if (activeFloorIdx === 0 && Math.hypot(player.worldX - arrival.spawn.x, player.worldZ - arrival.spawn.z) < 14) return null;
+      if (Math.hypot(player.worldX - exitLift.spawn.x, player.worldZ - exitLift.spawn.z) < 14) return null;
+      return { x: player.worldX, z: player.worldZ, floor: activeFloorIdx };
+    },
+    openSpot: (place) => {
+      const f = storeys[place.floor];
+      if (!f) return;
+      const o = f.rig.group.position;
+      const locker = f.content.staffLockers.find((l) => Math.hypot((l.rig.box.minX + l.rig.box.maxX) / 2 + o.x - place.x, (l.rig.box.minZ + l.rig.box.maxZ) / 2 + o.z - place.z) <= 2.5);
+      locker?.rig.flap();
+      sound.play('lockerOpen', { x: place.x, y: f.rig.group.position.y + 1, z: place.z }, 0.7);
+    },
+    exposeHider: () => {
+      if (hiddenIn) exitLocker();
+      suspicion = applySuspicion(suspicion, healthMode ? 12 : SPOT_SUSPICION);
+      hud.setSuspicion(suspicion);
+      hud.showToast(healthMode ? 'A GUARD OPENED YOUR HIDING PLACE · HEALTH −12' : `A GUARD OPENED YOUR HIDING PLACE · SUSPICION +${SPOT_SUSPICION}%`, 'bad', 3200);
+      if (isCaught(suspicion)) triggerCaught('Found hiding', 'A guard opened the place you were hiding in.');
+    },
+    camoActive: () => camo.active,
+    breakCamo: () => {
+      camo = { ...camo, active: false };
+      sound.play('camoOff');
+      hud.showToast('A GUARD SWEPT A LIGHT OVER YOU · CAMO BROKEN', 'bad');
+    },
+    canSee: (b) => hasLineOfSight(b.worldX, b.worldZ, player.worldX, player.worldZ, currentFloor().rig.wallBoxes, 8),
+  });
+
   function tickGuardCalls(): void {
     const f = storeys[activeFloorIdx];
     if (!f || Math.abs(player.worldY - activeFloorIdx * floorHeight) > 1.5) return;
@@ -11448,6 +11569,7 @@ function startJob(n: number, course: Course | null = null, dailyRun: DailyRun | 
     blasts.boom(at, 1);
     bursts.sparks(at, 0xffb050);
     bursts.smoke(at);
+    watch.empDischarge(fi < 0 ? activeFloorIdx : fi);
     let downed = 0;
     let chained = 0;
     for (const e of floor.content.enemies) {
@@ -11499,6 +11621,7 @@ function startJob(n: number, course: Course | null = null, dailyRun: DailyRun | 
   /** A silent takedown from behind: lunge in and drop it, with no noise for anyone to hear. */
   function performTakedown(e: Enemy): void {
     if (e.hit('takedown') !== 'disabled') return;
+    watch.noteTakedown(); // (where the agent stood when they went in, before the lunge: the habit counters' corner)
     leaveCover();
     player.lunge(e.worldX, e.worldZ);
     fireCooldown = TAKEDOWN_COOLDOWN_S;
@@ -11528,7 +11651,9 @@ function startJob(n: number, course: Course | null = null, dailyRun: DailyRun | 
   }
 
   /** How high above its own floor to aim at an enemy: a guard's chest, a drone up in the air, a dog low down. */
-  const enemyAimHeight = (e: Enemy): number => (e instanceof Bot ? 1.15 : e instanceof Drone ? 4.4 : e instanceof Alpha ? 0.8 : 0.6);
+  /** What the agent's gun can pick from: a sniper on its own floor only (the stun shot's cone is flat, and must not reach it through the floor above or below). */
+  const gunnable = (list: readonly Enemy[]): Enemy[] => list.filter((e) => !(e instanceof Sniper) || sniperReach(e.floorY, player.worldY));
+  const enemyAimHeight = (e: Enemy): number => (e instanceof Bot || e instanceof Sniper ? 1.15 : e instanceof Drone ? 4.4 : e instanceof Alpha ? 0.8 : 0.6);
 
   /** Where a shot from the platform that hits nothing ends: out along the tilt, or on the floor if the tilt takes it there first. */
   /** The line the crosshair is on, once the aim camera is all the way in: from the camera, down the middle of the view, so a shot goes exactly where the crosshair is (not from eye level, a little below it). */
@@ -11649,11 +11774,11 @@ function startJob(n: number, course: Course | null = null, dailyRun: DailyRun | 
     const aimHit = aiming ? aimedHit(floor) : null;
     let target = aiming
       ? aimHit?.target ?? null
-      : tryFire(player.worldX, player.worldZ, player.facingAngle, floor.content.enemies, shotWalls, shotCone) ?? tryFireUp(floor.content.enemies, floor.rig.wallBoxes, shotCone);
+      : tryFire(player.worldX, player.worldZ, player.facingAngle, gunnable(floor.content.enemies), shotWalls, shotCone) ?? tryFireUp(gunnable(floor.content.enemies), floor.rig.wallBoxes, shotCone);
     // On a stair, climbing, the storey above is already in view (its guards are shown from the middle of the flight): they can be shot from there, not only once the last step is off it.
     if (tower && !target && !aiming && !fromPerch && activeFloorIdx + 1 < storeys.length && player.worldY - floor.rig.group.position.y > floorHeight * 0.25 && stairsAt(player.worldY).length > 0) {
       const above = storeys[activeFloorIdx + 1]!;
-      target = tryFire(player.worldX, player.worldZ, player.facingAngle, above.content.enemies, above.rig.wallBoxes, shotCone);
+      target = tryFire(player.worldX, player.worldZ, player.facingAngle, gunnable(above.content.enemies), above.rig.wallBoxes, shotCone);
     }
     const tool = pickTool(target, empCharges, forceEmp);
     // With no enemy in the sights, a stun shot can put out a light or knock over clutter.
@@ -11708,6 +11833,7 @@ function startJob(n: number, course: Course | null = null, dailyRun: DailyRun | 
       const result = target instanceof Bot ? target.hit('stun', aimHit?.zone) : target?.hit('stun');
       if (target && result === 'disabled') {
         if (aiming) aimedDowns++;
+        if (target instanceof Bot) watch.noteStun(Math.hypot(target.worldX - player.worldX, target.worldZ - player.worldZ));
         enemyDown(target, to);
         hud.showToast(aimHit?.zone === 'head' ? 'HEADSHOT · BOT DISABLED' : 'BOT DISABLED', 'good');
       } else if (target && result === 'slowed') {
@@ -11732,6 +11858,7 @@ function startJob(n: number, course: Course | null = null, dailyRun: DailyRun | 
     stats.empsUsed++;
     activeTracers.push(spawnEmpPulse(root.scene, from, to, EMP_BLAST_RADIUS, floor.rig.group.position.y));
     sound.play('emp', { x: to.x, y: to.y, z: to.z });
+    watch.empDischarge(activeFloorIdx);
     const hits = empVictims(floor.content.enemies, to.x, to.z).map((e) => ({ e, r: e.hit('emp') }));
     const downed = hits.filter((h) => h.r === 'disabled').map((h) => h.e);
     const cracked = hits.filter((h) => h.r === 'damaged').length;
@@ -12592,6 +12719,7 @@ function startJob(n: number, course: Course | null = null, dailyRun: DailyRun | 
         playerY: player.worldY,
         floorY: active.rig.group.position.y,
         crowd: active.content.enemies,
+        partner: partnerMark(),
         playerX: player.worldX,
         playerZ: player.worldZ,
         sneaking: detectSneak,
@@ -12656,21 +12784,21 @@ function startJob(n: number, course: Course | null = null, dailyRun: DailyRun | 
           // A landed shot — visible tracer from the bot's muzzle to the
           // player, tinted differently from the player's own (cyan) so
           // which direction a shot came from reads at a glance.
-          if (!(e instanceof Bot || e instanceof Alpha)) return;
+          if (!(e instanceof Bot || e instanceof Alpha || e instanceof Sniper)) return;
           const muzzle = e.muzzleWorldPosition;
           // A guard fires a plain bolt; an alpha, blue bursts of long tracers or a rattle of short darts (the burst rifle's and the SMG's own shots, tinted).
           const enemyGun: BigGun | null = e instanceof Alpha ? (e.fireMode === 'burst' ? 'AR_4' : 'SMG_1') : null;
-          const enemyColor = e instanceof Alpha ? ALPHA_TRACER_COLOR : ENEMY_TRACER_COLOR;
+          const enemyColor = e instanceof Sniper ? SNIPER_TRACER_COLOR : e instanceof Alpha ? ALPHA_TRACER_COLOR : ENEMY_TRACER_COLOR;
           if (stats.seconds < dodgeUntil) {
             // Mid-dodge: the shot goes wide.
             const f = player.facingAngle;
             activeTracers.push(spawnShot(root.scene, enemyGun, muzzle, new THREE.Vector3(player.worldX + Math.cos(f) * 1.2, player.worldY + 1.2, player.worldZ - Math.sin(f) * 1.2), enemyColor));
-            sound.play(shotSound(enemyGun), { x: muzzle.x, y: muzzle.y, z: muzzle.z });
+            sound.play(shotSound(e instanceof Sniper ? 'Sniper_2' : enemyGun), { x: muzzle.x, y: muzzle.y, z: muzzle.z });
             hud.showToast('DODGED', 'good');
             return;
           }
           activeTracers.push(spawnShot(root.scene, enemyGun, muzzle, new THREE.Vector3(player.worldX, player.worldY + 1.2, player.worldZ), enemyColor));
-          sound.play(shotSound(enemyGun), { x: muzzle.x, y: muzzle.y, z: muzzle.z });
+          sound.play(shotSound(e instanceof Sniper ? 'Sniper_2' : enemyGun), { x: muzzle.x, y: muzzle.y, z: muzzle.z });
           sound.play('hurt');
           stats.timesHit++;
           if (!training) hud.showHint('dodge');
@@ -12678,12 +12806,27 @@ function startJob(n: number, course: Course | null = null, dailyRun: DailyRun | 
           bursts.sparks(new THREE.Vector3(player.worldX, player.worldY + 1.2, player.worldZ), 0xff6a4a);
           player.shake(0.45);
           hud.pulseDanger();
-          const hitCost = healthMode ? (e instanceof Alpha ? EXIT_HIT_SUSPICION + 6 : EXIT_HIT_SUSPICION) : e.kind === 'heavy' ? HEAVY_HIT_SUSPICION : BOT_HIT_SUSPICION;
+          const hitCost = healthMode ? (e instanceof Alpha ? EXIT_HIT_SUSPICION + 6 : EXIT_HIT_SUSPICION) : e instanceof Sniper ? SNIPER_HIT_SUSPICION : e.kind === 'heavy' ? HEAVY_HIT_SUSPICION : BOT_HIT_SUSPICION;
           suspicion = applySuspicion(suspicion, hitCost);
           hud.setSuspicion(suspicion);
           hud.showToast(healthMode ? `HIT · HEALTH −${hitCost}` : `HIT · SUSPICION +${hitCost}%`, 'bad');
-          if (isCaught(suspicion)) triggerCaught('Hit by enemy fire', e instanceof Alpha ? 'An alpha unit opened fire.' : 'A patrol bot opened fire.', { x: e.worldX, z: e.worldZ });
+          if (isCaught(suspicion)) triggerCaught('Hit by enemy fire', e instanceof Sniper ? 'A sniper put a round through you from across the hall.' : e instanceof Alpha ? 'An alpha unit opened fire.' : 'A patrol bot opened fire.', { x: e.worldX, z: e.worldZ });
           else player.flinch();
+        },
+        onSniperShot: (e, at, hit) => {
+          // A sniper's round: on the agent it is an ordinary hit (onShot, above); a miss cracks past; on the partner, a hit puts it down.
+          if (!(e instanceof Sniper)) return;
+          const muzzle = e.muzzleWorldPosition;
+          if (at === 'player' && hit) {
+            ctx.onShot(e);
+            return;
+          }
+          const f = player.facingAngle;
+          const to = at === 'partner' && partner ? new THREE.Vector3(partner.worldX, partner.worldY + 1.1, partner.worldZ) : new THREE.Vector3(player.worldX + Math.cos(f) * 1.1, player.worldY + 1.2, player.worldZ - Math.sin(f) * 1.1);
+          activeTracers.push(spawnShot(root.scene, null, muzzle, to, SNIPER_TRACER_COLOR));
+          sound.play(shotSound('Sniper_2'), { x: muzzle.x, y: muzzle.y, z: muzzle.z });
+          if (at === 'partner' && hit) partnerGoesDown();
+          else bursts.sparks(to, 0xffb050);
         },
         onCaught: (_e, title, reason) => {
           player.shake(0.8);
@@ -12864,6 +13007,7 @@ function startJob(n: number, course: Course | null = null, dailyRun: DailyRun | 
         }
       }
       tickSquad(active);
+      watch.tick(dt); // (the guards' radio check-ins and the counters to the player's habits: watch.ts)
       tickGuardFlashes(active, dt);
       noiseRing.update(player.worldX, player.worldY, player.worldZ, noise, dogListening || silent, dt);
       // The watchdog warning (dogwarn.ts): a dog hunts by ear and can be anywhere round a wall, so one on your trail (or just close) pings (panned toward it, quickening as it comes),
@@ -12975,7 +13119,7 @@ function startJob(n: number, course: Course | null = null, dailyRun: DailyRun | 
         const sightWalls = roofY !== null ? active.rig.wallBoxes.filter((b) => b.roof === undefined) : lyingUnderNow?.cover ? active.rig.wallBoxes.filter((b) => b !== lyingUnderNow) : active.rig.wallBoxes;
         const aim = aiming
           ? aimedTarget(active)
-          : tryFire(player.worldX, player.worldZ, player.facingAngle, active.content.enemies, sightWalls) ?? tryFireUp(active.content.enemies, active.rig.wallBoxes);
+          : tryFire(player.worldX, player.worldZ, player.facingAngle, gunnable(active.content.enemies), sightWalls) ?? tryFireUp(gunnable(active.content.enemies), active.rig.wallBoxes);
         // The gun swings round and up or down to what the auto-aim has in the sights (aiming from cover has the crosshair for that).
         player.aimGunAt(!aiming && aim && !carried ? { x: aim.worldX, y: aim.floorY + 1.15, z: aim.worldZ } : null, frameDt);
         const choice = pickTool(aim, empCharges, false, takedownTarget !== null && !carried && !aiming);
@@ -13013,6 +13157,7 @@ function startJob(n: number, course: Course | null = null, dailyRun: DailyRun | 
         nearestBot = Math.min(nearestBot, Math.hypot(e.worldX - player.worldX, e.worldZ - player.worldZ));
         if (e.alert) hunted = true;
         if (e.kind === 'watchdog' && Math.hypot(e.worldX - player.worldX, e.worldZ - player.worldZ) < DOG_HINT_DIST) toastOnce('dog', dogHint(), 7000);
+        if (e instanceof Sniper && e.lockedWho === 'player') toastOnce('sniper', keyed('SNIPER · BREAK THE LINE · COVER OR LOW FURNITURE (CROUCH, OR LIE FLAT) OR SMOKE ({smoke}) · IT NEEDS 1.5 SECONDS TO LOCK AGAIN'), 6400);
         if (e.kind === 'alpha' && Math.hypot(e.worldX - player.worldX, e.worldZ - player.worldZ) < ALPHA_HINT_DIST) toastOnce('alpha', `ALPHA UNIT: IT HEARS YOU AND SMELLS YOU CLOSE UP, HOWLS, SHOOTS AS SOON AS IT HAS YOU IN SIGHT (DODGE OR GET OUT OF SIGHT), RUNS AT YOU AND GOES OFF · THE RED RING IS ITS BLAST: SHOOT IT FROM OUTSIDE IT (IT TAKES DOWN EVERYONE AND SHORTS EVERY CAMERA IN THE RING, AND RAISES NO SUSPICION), OR EMP IT TO STOP IT FOR GOOD`, 8200);
       }
       const threat = threatLevel(nearestBot, hunted);
@@ -14058,6 +14203,27 @@ function takeEntry(): EntryId {
   if (inFrame) window.parent.postMessage({ maze: 'ready' }, '*');
 }
 
+/**
+ * Starts a level from a spec (specload.ts): `raw` is the spec as JSON text, base64url text or an object. It is clamped (shared/levelspec.ts), and said to be: what changed comes back. The level is built the way a practice
+ * Daily is, from the spec's own seed, so the same spec makes the same level, and it is never scored, saved or carried over. Also `window.__loadSpec` (any host: the page's own Director uses it) and `?spec=` on localhost.
+ */
+function startSpec(raw: unknown): { ok: boolean; changes: string[]; error?: string } {
+  const read = typeof raw === 'string' ? decodeSpecParam(raw) : { ok: true as const, value: raw };
+  if (!read.ok) return { ok: false, changes: [], error: read.error };
+  const { spec, changes } = clampSpec(read.value);
+  // A sketch with no dead ends for its rooms gets closets opened in its solid blocks (the verifier does the same, so what is checked is what is built).
+  const closets = carveAlcoves(spec);
+  if (closets.grid && closets.carved.length) {
+    spec.grid = closets.grid;
+    changes.push(`the grid had too few dead ends for the rooms the job needs; opened ${closets.carved.length} closets at ${closets.carved.map((c) => `${c.x},${c.y}`).join(' ')}`);
+  }
+  const job = specJob(spec, PLAYABLE);
+  hud.closeMissionBrief();
+  startJob(job.level, null, { day: '2026-10-01', number: job.level, seed: job.seed, scored: false, carry: NO_CARRY, week: [], spec: job });
+  return { ok: true, changes };
+}
+(window as unknown as { __loadSpec: typeof startSpec }).__loadSpec = startSpec;
+
 // Testing on your own machine (served from localhost, never on Reddit): `?job=9` skips the brief and starts
 // job 9 straight away, `?job=training` starts training, `?agent=female` picks the body, `?look=operative` wears the suit, and `?suit=olive`
 // and `?hair=long` pick its colour and hair; `?ending=public` or `?ending=private` sets the story's ending (not saved), `?clear=1` clears the job a moment in, `?caught=1` has you caught a few seconds in, `?intro=1` plays the opening cutscene, and `?card=5.2` shows a memory card.
@@ -14155,7 +14321,9 @@ if (/^(localhost|127\.0\.0\.1)$/.test(window.location.hostname)) {
     hud.closeMissionBrief();
     go();
   };
-  if (job === 'training') window.setTimeout(() => start(() => startJob(1, 'basics')), 0);
+  if (params.get('spec') !== null) {
+    // (`?spec=` is read on any host, below.)
+  } else if (job === 'training') window.setTimeout(() => start(() => startJob(1, 'basics')), 0);
   else if (job === 'grapple') window.setTimeout(() => start(() => startJob(1, 'grapple')), 0);
   else if (job === 'stealth') window.setTimeout(() => start(() => startJob(1, 'stealth')), 0);
   else if (job === 'weapons') window.setTimeout(() => start(() => startJob(1, 'weapons')), 0);
@@ -14178,6 +14346,24 @@ if (/^(localhost|127\.0\.0\.1)$/.test(window.location.hostname)) {
     if (local) practiceBodies = Math.max(0, Math.min(4, Math.floor(Number(params.get('bodies')) || 0)));
     const run: DailyRun | null = Number.isFinite(seed) ? { day: '2026-10-01', number: n, seed, scored: false, carry: NO_CARRY, week: [] } : null;
     window.setTimeout(() => start(() => startJob(n, null, run, way)), 0);
+  }
+}
+
+// `?spec=<base64url of a LevelSpec's JSON>` builds that level, on any host (the Director page opens it in a new tab): clamped, never scored, saved or carried over (specload.ts, startSpec).
+// What the clamp changed goes to the console and a toast; a spec that cannot be read leaves the usual brief and says why in a toast.
+{
+  const specParam = new URLSearchParams(window.location.search).get('spec');
+  if (specParam !== null) {
+    window.setTimeout(() => {
+      const out = startSpec(specParam);
+      if (!out.ok) {
+        console.error(`spec: ${out.error ?? 'not loaded'}`);
+        hud.showToast(`LEVEL SPEC NOT READ · ${(out.error ?? 'UNKNOWN ERROR').toUpperCase()}`, 'bad', 9000);
+      } else if (out.changes.length) {
+        console.warn(`spec: clamped\n${out.changes.join('\n')}`);
+        hud.showToast(`LEVEL SPEC ADJUSTED · ${out.changes.length} CHANGE${out.changes.length === 1 ? '' : 'S'} (SEE CONSOLE)`, 'neutral', 5000);
+      }
+    }, 0);
   }
 }
 
