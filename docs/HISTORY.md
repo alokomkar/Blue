@@ -228,7 +228,7 @@ Rooms recovered from the sketch, as a 16 x 16 grid (digits are rooms, dots are w
 |---|---|
 | ![coop bunker](img/coop-bunker.jpg) | ![coop exit](img/coop-exit.jpg) |
 
-### ce1d426 · 22:34 · Add the project history: every commit in plain terms, phase summaries, screenshots
+### ce1d426 · 22:28 · Add the project history: every commit in plain terms, phase summaries, screenshots
 - **Input:** you asked for a record of each commit with its input, output and a plain explanation, a summary at the end
   of each phase, and screenshots where useful.
 - **Output:** this file, with an entry for each of the first 19 commits, three part summaries, and 9 screenshots in
@@ -236,14 +236,14 @@ Rooms recovered from the sketch, as a 16 x 16 grid (digits are rooms, dots are w
   Muse Image sketch. Linked from the README and the interactive page.
 - **In plain terms:** a diary of the project you can read without knowing git.
 
-### 32156b7 · 22:41 · Add local HTML pages for the project history, built from HISTORY.md
+### 32156b7 · 22:31 · Add local HTML pages for the project history, built from HISTORY.md
 - **Input:** you asked for the history as local HTML files, one per phase if needed.
 - **Output:** `docs/history.html` (overview with a card per part and a table of every commit) and one page per part
   (`phase-0.html`, `pre-event.html`, `phase-1.html`), generated from this file by `node scripts/build-history.mjs`. Checked
   headlessly: no errors, every image loads, no sideways scroll at phone width.
 - **In plain terms:** the diary now also exists as pages you can open from disk, and they update when this file does.
 
-### 09f7193 · 22:58 · Add the Heist Director: a request in words becomes a verified level, streamed round by round
+### 09f7193 · 22:42 · Add the Heist Director: a request in words becomes a verified level, streamed round by round
 - **Input:** you asked me to write the Director's server side while the loader was being built.
 - **Output:** `POST /api/ai/director` streams events (`round`, `spec`, `verify`, `done`). Each round asks Muse Spark for a
   level in the schema, runs the verifier, and sends the failures back as the next message, up to four rounds. If the
@@ -260,12 +260,12 @@ Rooms recovered from the sketch, as a 16 x 16 grid (digits are rooms, dots are w
 - **In plain terms:** you can now type what level you want, watch the AI build it, watch the checker say "the exit is too
   close", and watch the AI fix it. The second example is the demo moment for "verifiable agent". The third shows the safety net.
 
-### af3e0d3 · 23:00 · Record the Director in the history and the spike notes
+### af3e0d3 · 22:43 · Record the Director in the history and the spike notes
 - **Input:** the Director's live runs.
 - **Output:** the history entries and a spike addendum; the pages regenerated.
 - **In plain terms:** the diary caught up with the work.
 
-### 308db3a · 23:28 · Add the Heist Director page, and stop Meta's filter rejecting benign requests
+### 308db3a · 23:17 · Add the Heist Director page, and stop Meta's filter rejecting benign requests
 - **Input:** you asked for something playable: a page where you describe a level and watch the Director work. While
   testing it, a harmless request ("Quiet refinery sabotage, no dogs, small floor.") came back as a ready-made level with
   the note that the model's filter would not take it.
@@ -291,12 +291,12 @@ Rooms recovered from the sketch, as a 16 x 16 grid (digits are rooms, dots are w
 |---|---|
 | ![director page](img/director-page.jpg) | ![generated level](img/director-game.jpg) |
 
-### 60ed1b8 · 23:31 · History: the Director page and the filter fix
+### 60ed1b8 · 23:19 · History: the Director page and the filter fix
 - **Input:** you asked that the local HTML files are updated as features land.
 - **Output:** the entry for the Director page and its two screenshots, the regenerated pages.
 - **In plain terms:** the diary is kept up as we go.
 
-### 3162781 · 23:55 · Spec loader groundwork: grid support, seeded build phases, and fixes for floors with loops
+### 3162781 · 23:30 · Spec loader groundwork: grid support, seeded build phases, and fixes for floors with loops
 - **Input:** the plan's spike 2: does the game cope with a floor that has loops (a photo-to-map sketch is not a tree; the
   game's mazes always were)? A helper built the spec loader and tested two hand-made grids: a ring corridor round a
   block with a side room, and a three-room plan like the sketch.
@@ -316,11 +316,55 @@ Rooms recovered from the sketch, as a 16 x 16 grid (digits are rooms, dots are w
   every floor is a tree. The page side of the loader (`game.ts`) is written but is waiting to be committed together
   with the gameplay helpers' edits, which share that file.
 
+### 9b91cf1 · 23:58 · Add the tower sniper: a new enemy that aims for 1.5 s behind a red laser
+- **Input:** your choice of tower snipers as the tower's signature threat.
+- **Output:** a sniper stands on a ranked post (a gallery, a first floor, an office) with a lane of at least five cells,
+  placed by seed: 2, 2, 3, 3, 3, 4 snipers for jobs 1 to 6. It sweeps, locks on (0.7 to 1.3 s in the open), and fires
+  1.5 s later for +35 suspicion; a red laser sight with a reticle is the tell. **Counters:** cover, crouching or lying
+  behind low furniture, smoke, a flash and camo break the lock; a dodge on cue makes the shot miss (7 of 7 did); an EMP
+  drops it for good; stun it from its own floor or take it down from behind (15 of 15 were reached). Stun shots are
+  blocked when you are more than 1.8 m above or below it. It also shoots the AI partner (18 of 30 shots put the partner
+  down, the 0.45 chance designed). 24 positions behind real furniture: 0 hits. The tower's critical path (stairs, lifts, key,
+  heist door, back down) on all six places, solo and with the partner: completed with 0 hits and 0 catches. 31 new tests.
+- **In plain terms:** the tower now has an enemy you can't just run past: you see a red line and a ring on you and have
+  about a second and a half to break the line, dodge, or deal with it. It is a new kind of enemy, so the guards' code is untouched.
+
+| A sniper's laser locking on |
+|---|
+| ![sniper lock](img/sniper-laser_lock.jpg) |
+
+### b2da530 · 23:58 · Add radio check-ins and habit counters
+- **Input:** your choice of radio check-ins and counters to the player's habits.
+- **Output:** patrols and sentries on your floor report in every 30 to 45 s on a small HUD feed. A silent guard sends
+  the two nearest guards to its last position (first miss, 13 to 41 s after a stun), and a second miss (31 to 37 s later)
+  raises the alert a step ("ALL UNITS CONVERGE" in the bunker). An EMP freezes the radio for exactly 20 s; a dark cell is not
+  heard. **Counters** (4 of 5): a reused hiding spot is opened (+40 suspicion), a corner used for takedowns is held by two
+  guards for 40 s, a worn lane gets a waiting guard for 45 s, repeated camo is broken by a close look for 60 s; each fires once
+  per level, 72 to 87 s apart, and is announced on the radio. Not done: visors against stun-from-range (needs a change in a
+  file the private build overwrites). A seeded level logged the identical radio and miss log in two runs in all 6 setups,
+  solo and with the partner. 30 new tests.
+- **In plain terms:** silent takedowns now have a clock on them, and winning the same way over and over makes the guards
+  adapt, with Control telling you what they are doing.
+
+| A second miss: "CH 2: STILL SILENT · CAUTION RAISED" | A counter announced: "CONTROL: LIGHTS UP · SWEEP CLOSE" |
+|---|---|
+| ![radio miss](img/radio-miss2.jpg) | ![radio counter](img/radio-counter.jpg) |
+
+### cc61a81 · 00:00 · Wire the loader, radio check-ins and snipers into the game
+- **Input:** three helpers had edited the same file, `game.ts`, so its halves could not be committed separately.
+- **Output:** the wiring for the spec loader (`?spec=`), the radio and habits (the Watch each frame, the counters), and
+  the snipers (posts, spawning, the height gate, the partner as a target), committed together after the modules each depends on
+  (each of those was checked alone in a clean copy first: 985 tests with the sniper, 1015 with the radio). Checked as a whole:
+  type-check, 1015 tests, lint, build, and five levels (maze, tower, bunker, tower with the partner, exit) loaded headlessly
+  with no page errors.
+- **In plain terms:** the three features are now switched on in the game. Played on your stable builds below.
+
 ### Phase 1 summary (so far, in progress)
 - **Achieved:** the Heist Director end to end (the server loop, plus a page where you describe a level, watch the repair rounds and play the result; the model's content filter tamed from about 25% to 0 of 20);  the API plumbing with a safe key path; the level spec and verifier; the Meta key tested against every
   model we plan to use; the three biggest risks (SAM on a sketch, structured output, voice latency) answered with real
   numbers; co-op on all four levels.
-- **Numbers:** 940 unit tests at the latest commit (836 at the baseline), lint and type-check clean, 27 commits.
+- **Numbers:** 940 unit tests at the latest commit (836 at the baseline), lint and type-check clean, 30 commits.
+- **Also achieved (gameplay track):** radio check-ins, habit counters (4 of 5) and tower snipers, all tested headlessly with and without the partner.
 - **Also achieved:** the loop test passed after three fixes, and `?spec=` loads a level from a spec (its `game.ts` half is written and waits to be committed with the gameplay edits).
 - **Still open in this phase:** the Vercel deployment, and your three real sketch photos. The verifier does not yet flag doors or lasers silently dropped on a looped grid, and start and exit should sit in dead ends or corners.
-- **Next:** the voice fast path, then the photo-to-map endpoint. In parallel (gameplay track, in progress): radio check-ins and habit counters, and tower snipers.
+- **Next:** the voice fast path, then the photo-to-map endpoint. Gameplay track still to do: riot shields in the exit waves (Nov 2), bunker turrets, fans and lamps, and the alpha dog and dogs (not in the plan yet).
