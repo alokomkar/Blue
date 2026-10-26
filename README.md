@@ -83,9 +83,7 @@ those exist the game calls `/api/*`, gets nothing back, and carries on.
 ## Assets
 
 Everything under `public/models` is CC0 (Quaternius) or original work; see
-[`public/models/CREDITS.md`](public/models/CREDITS.md). The live demo may additionally load a private set of
-animations from `public/models/private/`, which is git-ignored and never part of this repo; without it the game uses
-the CC0 clips.
+[`public/models/CREDITS.md`](public/models/CREDITS.md). The live demo can additionally use a private set of the project's original character animations, which are not CC0 and are never part of this repo: they live in the git-ignored `public/models/private/` and `private-overlay/`. `scripts/restore-private-assets.sh` recreates them from the original game repo on the author's machine, and `npm run build:original` builds the demo with them (`dist-original/`). Without them the game uses the CC0 clips, and `npm run build` is the build everyone else gets.
 
 ## Docs
 

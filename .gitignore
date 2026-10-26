@@ -9,3 +9,5 @@ dist/
 
 # Original (Mixamo-derived) animations and models: used only by the live demo, never committed
 public/models/private/
+private-overlay/
+dist-original/
