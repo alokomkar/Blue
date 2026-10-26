@@ -10,11 +10,11 @@ answers that. It sits beside the four AI features in [`PLAN.md`](PLAN.md) and is
 2. **Counter the player's habits**: yes.
 3. **A signature threat per level**:
    - Tower: snipers.
-   - Bunker: turrets, no heavy guards, a taller space with sniper platforms, stairs up to them, bridges between them,
-     ceiling fans and hanging lights.
+   - Bunker: turrets, no heavy guards, ceiling fans and hanging lights. The taller space with sniper platforms,
+     stairs and bridges was costed at 19 to 25 days and is deferred (section 4).
    - Shootout exit: lit well (done, see below). Signature threat: riot-shield guards that need a flash grenade to open.
-4. **Bunker heights** (chosen): storey 8 m (today 4 m); sniper platforms and bridges at 6 m, which is two wall heights
-   (walls are 3 m).
+4. **Bunker heights** (chosen, then overtaken by the study): storey 8 m, platforms and bridges at 6 m. The bunker is
+   already 7 m per storey with 6 m walls, and the platforms are deferred.
 5. **Lighting**: the bunker and the shootout exit are lit (cool strip light in the bunker, warm light and every storey
    known in the exit). The tower stays dark.
 6. **Schedule** (chosen): the small items first, the bunker rebuild timeboxed.
@@ -58,28 +58,30 @@ storeys, a long, narrow view that reaches across the atrium and through glass, a
 aim before the shot. Counterplay: break the line (cover, smoke, EMP on the scope), cross while it re-aims, or go round and
 take it down from behind. Two to four per tower, more at higher job numbers. Uses the existing sniper gun model.
 
-## 4. Bunker: tall, with sniper platforms
+## 4. Bunker: turrets, fans and hanging lamps (platforms deferred)
 
-- **Space:** the storey is 8 m. Sniper platforms and the bridges that connect them are at 6 m, two wall heights. Ceiling
-  fans turn above them, and lamps hang on chains from the roof (a few real lights, the rest glowing meshes, inside the
-  existing light budget).
-- **Platforms:** catwalks along the long sides, a parapet at the front. A stairway from the floor reaches each one (6 m of
-  rise at the existing gentle 27° is a three-cell run, treads no taller than 0.2 m).
-- **Bridges:** walkable, with rails, joining platforms across the hall. They give the player a vantage point over the
-  whole level, and cross sniper lines.
-- **Snipers:** higher eye, longer range (about 1.6× a guard's) and they see over container stacks. They cannot be hit
-  from the floor: the platform and parapet are between you and them. The only way to take one down is to climb the stair
-  (or cross a bridge from another platform) and take it down from behind or stun it close up.
-- **Turrets:** wall- and ceiling-mounted, sweeping a cone, with a laser tell; shorted out by an EMP, or by the console that
-  controls them. **No heavy guards** in the bunker.
-- **Engineering notes (to check in a spike first):**
-  - The bunker's levels are `RawPlan` storeys of cells (`bunkerplan.ts`); the walkable container roofs
-    (`roofSurfaces`, with a height `rel`) are the closest existing thing to a platform. The rebuild should extend that
-    mechanism with parapets, long stairs and bridges before inventing another.
-  - Stairs: bunker stairs are cell-based, one flight per storey; a flight from the floor to 6 m is new.
-  - Doubling the storey height affects the camera, the grapple and duct shafts (their lengths), lamp heights, wall meshes
-    and the sight/occlusion boxes. The spike measures that cost first.
-  - The AI partner must follow up the platform stairs and across the bridges (see the co-op rules in the plan).
+**Feasibility study (Oct 26, read-only) changed this section.** Findings:
+
+- The bunker is already tall: storeys are 7 m (`TALL_FLOOR_HEIGHT`) and walls 6 m (`BUNKER_WALL_H`), not the 4 m and 3 m
+  of the tower. A 6 m platform would sit at today's wall top, and the earlier "double the height" premise is moot.
+- The full design (sniper platforms with stairs, bridges, snipers that cannot be hit from below, partner support) is
+  about **19 to 25 focused days**: platforms, stairs and bridges 8 to 11; snipers and turrets 4 to 6; fans and lamps
+  1.5 to 2.5; partner 3 to 4; height 1 to 1.5. Most of that is foundation: the game has a single height field per
+  storey, no height bands in collision (a parapet or ramp side needs them), a `round(y / storeyHeight)` storey snap
+  that would put a 6 m deck on the next storey, and flat (2D) stun shots that would reach a platform from the floor.
+- Nine building days and four AI features cannot carry that, so the platform concept is **deferred**.
+
+**Decision (default, chosen when asked for a preference; change on request): build the cheap, visible parts.**
+
+- **Turrets:** wall- and ceiling-mounted, sweeping a cone, red laser tell; shorted out by EMP or the console that controls
+  them. They reuse the camera plan (`towerCams`) rather than the enemy loop. No heavy guards in the bunker.
+- **Ceiling fans** turning in the halls, and **hanging lamps** on chains (a few real lights inside the 10-light budget,
+  the rest emissive meshes). The bunker has no ceiling mesh today (upper storeys are hidden), so these hang from the
+  storey's top and need deck-free sight lines. About 3 to 4 days in all, timeboxed to 3.
+- **Snipers stay in the tower** (section 3), where they stand on ordinary floors and balconies and need no new geometry.
+- **Later (stretch, or after the event):** one sniper platform with a stairway, then bridges and partner support, in the
+  build order the study gave: height, a shared layer and banded collision, platforms and ramps (player only), bridges,
+  a `base` height on blocking boxes plus a height gate on flat shots, snipers and turrets, lamps and fans, the partner.
 
 ## 5. Shootout exit: riot-shield guards
 
@@ -117,7 +119,7 @@ turned aside, which rewards moving round them.
 | Phase 2 (Oct 29–30) | Radio check-ins and habit counters (small, pure rules plus glue) |
 | Phase 3 (Oct 31 – Nov 1) | Tower snipers |
 | Phase 4 (Nov 2) | Riot-shield guards in the exit waves (small: the shield rules exist) |
-| After the voice partner and Director v1 are playable | Bunker spike (half a day), then the rebuild, **timeboxed to 2 days**; if the spike or the first day says no, cut to turrets plus a single sniper platform with one stair |
+| After the voice partner and Director v1 are playable | Bunker turrets, fans and hanging lamps, **timeboxed to 3 days** (the platform rebuild is deferred) |
 
 ## Open questions
 
