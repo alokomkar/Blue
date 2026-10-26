@@ -2974,7 +2974,8 @@ function startJob(n: number, course: Course | null = null, dailyRun: DailyRun | 
   }
 
   /** What the partner is doing to get to another floor: where it heads now, and the lift to ride when it has got to the doors. */
-  type PartnerGoal = { x: number; z: number; waypoint?: boolean; ride?: PartnerWay };
+  type PartnerGoal = { x: number; z: number; waypoint?: boolean; ride?: PartnerWay; direct?: boolean };
+  let partnerCabLined = false; // (in a lift's cab, lined up on the way out through its doors)
 
   /**
    * Where the partner heads when the straight way to its spot is shut (a wall between, you came by the pipes or a vent, you are on another floor): the middle of the next corridor cell
@@ -2986,15 +2987,26 @@ function startJob(n: number, course: Course | null = null, dailyRun: DailyRun | 
     const { navCells, cols, rows } = floor.content;
     const o = floor.rig.group.position;
     const fi = partner.currentFloorIdx;
-    // In a lift's cab (after a ride): out through its doors, along the line from the middle of the cab to them, not at a slant across the door jamb.
+    // In a lift's cab (after a ride): out through its doors, along the line from the middle of the cab to them, not at a slant across the door jamb; and on out to just past them.
     for (const l of towerLifts) {
-      if (l.level !== fi || !l.rig.contains(partner.worldX - o.x, partner.worldZ - o.z)) continue;
+      if (l.level !== fi) continue;
       const mid = { x: l.rig.spawn.x + o.x, z: l.rig.spawn.z + o.z };
       const door = { x: l.rig.front.x + o.x, z: l.rig.front.z + o.z };
+      const toDoor = Math.hypot(partner.worldX - door.x, partner.worldZ - door.z);
+      const inside = l.rig.contains(partner.worldX - o.x, partner.worldZ - o.z);
+      if (!inside && !(partnerCabLined && toDoor < 2.4)) continue;
+      if (toDoor < 0.6) {
+        partnerCabLined = false; // (out: the way on is the usual one)
+        break;
+      }
       const len = Math.hypot(door.x - mid.x, door.z - mid.z) || 1;
       const off = Math.abs((door.x - mid.x) * (partner.worldZ - mid.z) - (door.z - mid.z) * (partner.worldX - mid.x)) / len; // how far it is from that line
-      return off > 0.35 ? { x: mid.x, z: mid.z, waypoint: true } : { x: door.x, z: door.z, waypoint: true };
+      // (At the middle it is lined up: from there it heads straight out, and keeps to it however it is nudged off the line.)
+      if (Math.hypot(partner.worldX - mid.x, partner.worldZ - mid.z) < 0.5) partnerCabLined = true;
+      return partnerCabLined || off <= 0.35 ? { x: door.x, z: door.z, waypoint: true, direct: true } : { x: mid.x, z: mid.z, waypoint: true, direct: true };
     }
+    const here0 = { x: partner.worldX - o.x, z: partner.worldZ - o.z };
+    if (!towerLifts.some((l) => l.level === fi && l.rig.contains(here0.x, here0.z))) partnerCabLined = false;
     let goal: { x: number; z: number };
     if (sameFloor) {
       goal = { x: player.worldX, z: player.worldZ };
@@ -3336,7 +3348,7 @@ function startJob(n: number, course: Course | null = null, dailyRun: DailyRun | 
           const gait = { sneak: stance.sneak && (reach < CATCH_UP || stance.prone), prone: false };
           const stepGoal = goInput(me, goal, gait, goal.waypoint ? 0.25 : up ? UP_HOLD_REACH * 0.3 : 0.5, true);
           // (It steers for a point aside when something stands in the way, but is there when it is at the goal.)
-          const step = stepGoal.arrived ? stepGoal : goInput(me, partnerAim(me, goal, walls, gait, dt), gait, 0.25, true);
+          const step = stepGoal.arrived || goal.direct ? stepGoal : goInput(me, partnerAim(me, goal, walls, gait, dt), gait, 0.25, true);
           input = up && step.arrived ? { turn: turnToward(me.angle, headingTo(me, here)), throttle: 0, sneak: false, prone: false, dash: false } : { ...step, dash: stepGoal.dash && reach > CATCH_UP && !stance.prone && !up }; // (it runs only along a straight stretch: at full tilt it overshoots a waypoint and has to turn round to it)
         } else if (!sameFloor) {
           // No stairs or lift to you (you went up by a climb, a shaft or a drop): it stays put; after a while it is put beside you.
@@ -3417,7 +3429,7 @@ function startJob(n: number, course: Course | null = null, dailyRun: DailyRun | 
     }
     // A partner that is trying to walk but is not getting anywhere (wedged in a doorway or on a corner, or on the wrong floor with no way down) for a while: put back with you.
     if (partnerState === 'free' && !partnerCoverReady) {
-      if (Math.hypot(partner.worldX - partnerStuck.x, partner.worldZ - partnerStuck.z) > 0.35 || partnerTryLeft <= 0) {
+      if (Math.hypot(partner.worldX - partnerStuck.x, partner.worldZ - partnerStuck.z) > 0.7 || partnerTryLeft <= 0) { // (a creep to and fro against a corner is not getting anywhere)
         partnerStuck.x = partner.worldX;
         partnerStuck.z = partner.worldZ;
         partnerStuck.t = 0;
