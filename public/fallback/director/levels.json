@@ -1,0 +1,218 @@
+{
+  "campus": {
+    "version": 1,
+    "title": "Night at the campus",
+    "brief": "Records are kept in the admin wing: take them and leave before the morning staff.",
+    "place": "campus",
+    "layout": "halls",
+    "size": {
+      "cols": 12,
+      "rows": 8
+    },
+    "floors": 2,
+    "seed": 1,
+    "contract": "records",
+    "twists": [],
+    "roster": {
+      "guards": 3,
+      "watchdogs": 1,
+      "crawlers": 0,
+      "alphas": 0,
+      "drones": 0,
+      "heavies": 0
+    },
+    "hazards": {
+      "doors": 1,
+      "lasers": 1,
+      "lines": 1,
+      "gates": 2,
+      "sweepers": 0,
+      "sliders": 0,
+      "shutters": 0,
+      "blackouts": 0
+    },
+    "loot": {
+      "documents": 2
+    }
+  },
+  "museum": {
+    "version": 1,
+    "title": "After hours at the museum",
+    "brief": "One piece is worth more than the rest of the collection: it is in the vault.",
+    "place": "museum",
+    "layout": "aisles",
+    "size": {
+      "cols": 12,
+      "rows": 8
+    },
+    "floors": 2,
+    "seed": 1,
+    "contract": "vault",
+    "twists": [],
+    "roster": {
+      "guards": 3,
+      "watchdogs": 1,
+      "crawlers": 0,
+      "alphas": 0,
+      "drones": 0,
+      "heavies": 0
+    },
+    "hazards": {
+      "doors": 1,
+      "lasers": 1,
+      "lines": 1,
+      "gates": 2,
+      "sweepers": 0,
+      "sliders": 0,
+      "shutters": 0,
+      "blackouts": 0
+    },
+    "loot": {
+      "documents": 2
+    }
+  },
+  "refinery": {
+    "version": 1,
+    "title": "The refinery shutdown",
+    "brief": "Take the plant offline from the control room without raising the alarm.",
+    "place": "refinery",
+    "layout": "fishbone",
+    "size": {
+      "cols": 12,
+      "rows": 8
+    },
+    "floors": 2,
+    "seed": 1,
+    "contract": "sabotage",
+    "twists": [],
+    "roster": {
+      "guards": 3,
+      "watchdogs": 1,
+      "crawlers": 0,
+      "alphas": 0,
+      "drones": 0,
+      "heavies": 0
+    },
+    "hazards": {
+      "doors": 1,
+      "lasers": 1,
+      "lines": 1,
+      "gates": 2,
+      "sweepers": 0,
+      "sliders": 0,
+      "shutters": 0,
+      "blackouts": 0
+    },
+    "loot": {
+      "documents": 2
+    }
+  },
+  "bank": {
+    "version": 1,
+    "title": "The branch vault",
+    "brief": "The vault holds what the branch is hiding: get in and out clean.",
+    "place": "bank",
+    "layout": "plus",
+    "size": {
+      "cols": 12,
+      "rows": 8
+    },
+    "floors": 2,
+    "seed": 1,
+    "contract": "vault",
+    "twists": [],
+    "roster": {
+      "guards": 3,
+      "watchdogs": 1,
+      "crawlers": 0,
+      "alphas": 0,
+      "drones": 0,
+      "heavies": 0
+    },
+    "hazards": {
+      "doors": 1,
+      "lasers": 1,
+      "lines": 1,
+      "gates": 2,
+      "sweepers": 0,
+      "sliders": 0,
+      "shutters": 0,
+      "blackouts": 0
+    },
+    "loot": {
+      "documents": 2
+    }
+  },
+  "warehouse": {
+    "version": 1,
+    "title": "Dock six",
+    "brief": "A shipment is leaving at dawn: find it before it does.",
+    "place": "warehouse",
+    "layout": "uturn",
+    "size": {
+      "cols": 12,
+      "rows": 8
+    },
+    "floors": 2,
+    "seed": 1,
+    "contract": "shipment",
+    "twists": [],
+    "roster": {
+      "guards": 3,
+      "watchdogs": 1,
+      "crawlers": 0,
+      "alphas": 0,
+      "drones": 0,
+      "heavies": 0
+    },
+    "hazards": {
+      "doors": 1,
+      "lasers": 1,
+      "lines": 1,
+      "gates": 2,
+      "sweepers": 0,
+      "sliders": 0,
+      "shutters": 0,
+      "blackouts": 0
+    },
+    "loot": {
+      "documents": 2
+    }
+  },
+  "lab": {
+    "version": 1,
+    "title": "The sample room",
+    "brief": "Extract the sample from the cold store and leave nothing behind.",
+    "place": "lab",
+    "layout": "halls",
+    "size": {
+      "cols": 12,
+      "rows": 8
+    },
+    "floors": 2,
+    "seed": 1,
+    "contract": "extract",
+    "twists": [],
+    "roster": {
+      "guards": 3,
+      "watchdogs": 1,
+      "crawlers": 0,
+      "alphas": 0,
+      "drones": 0,
+      "heavies": 0
+    },
+    "hazards": {
+      "doors": 1,
+      "lasers": 1,
+      "lines": 1,
+      "gates": 2,
+      "sweepers": 0,
+      "sliders": 0,
+      "shutters": 0,
+      "blackouts": 0
+    },
+    "loot": {
+      "documents": 2
+    }
+  }
+}

@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Heist Director</title>
+    <link rel="stylesheet" href="director.css" />
+  </head>
+  <body>
+    <header class="top">
+      <div class="wrap">
+        <a class="brand" href="game.html">Operation Blueprint</a>
+        <span class="sp"></span>
+        <button id="theme" type="button" aria-label="Toggle theme" title="Toggle theme">◐</button>
+      </div>
+    </header>
+    <main class="wrap">
+      <h1>Heist Director</h1>
+      <p class="lede">Describe a job in your own words. An AI designs the level, a checker tries to break it, and the AI fixes what the checker finds, until the level can be finished. Then you play it.</p>
+
+      <form id="form" autocomplete="off">
+        <label for="prompt">The job</label>
+        <textarea id="prompt" rows="3" maxlength="500" placeholder="A night job at a museum: two guards, one dog, steal a painting from the vault."></textarea>
+        <div class="chips" id="examples" role="group" aria-label="Examples"></div>
+        <div class="row">
+          <label class="seed">Seed (optional) <input id="seed" type="number" min="0" max="4294967295" step="1" inputmode="numeric" placeholder="random" /></label>
+          <button id="go" type="submit" class="primary">Build the level</button>
+          <button id="stop" type="button" hidden>Stop</button>
+        </div>
+        <p class="note">Your request is sent to Meta's model to design the level. Don't put anything personal in it.</p>
+      </form>
+
+      <p id="status" role="status" aria-live="polite"></p>
+      <ol id="rounds" class="rounds"></ol>
+      <section id="result" class="result" hidden></section>
+      <section id="offline" class="offline" hidden>
+        <h2>Ready-made levels</h2>
+        <p>The Director can't be reached, so here are levels that are ready to play.</p>
+        <div id="ready" class="ready"></div>
+      </section>
+    </main>
+    <script type="module" src="./director.ts"></script>
+  </body>
+</html>

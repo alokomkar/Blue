@@ -11,6 +11,9 @@ import { pickFallback } from './fallbacks.ts';
 
 export type DirectorInput = { prompt: string; seed?: number };
 
+/** How many times one round's model call is made when the content filter rejects it. */
+export const FILTER_TRIES = 3;
+
 export type DirectorEvent =
   | { type: 'round'; n: number; of: number }
   | { type: 'spec'; n: number; spec: LevelSpec; changes: string[] }
@@ -34,7 +37,7 @@ export const SYSTEM_PROMPT = `You design one level of a stealth-heist game from 
 
 Ranges (the game's own limits): the floor is ${range(SPEC_LIMITS.cols)} columns by ${range(SPEC_LIMITS.rows)} rows; guards ${range(SPEC_LIMITS.roster.guards)} per floor, watchdogs (dogs) ${range(SPEC_LIMITS.roster.watchdogs)}, lasers ${range(SPEC_LIMITS.hazards.lasers)}, doors ${range(SPEC_LIMITS.hazards.doors)}, documents ${range(SPEC_LIMITS.documents)}. Prefer small numbers: a level must be finishable.
 Places: ${PLACE_IDS.join(', ')}. Layouts: ${LAYOUT_IDS.join(', ')}. Contracts: ${CONTRACT_IDS.join(', ')}. Twists (at most two, and they must suit the contract): ${TWIST_IDS.join(', ')}.
-The title is at most ${TITLE_MAX} characters and the brief one sentence of at most ${BRIEF_MAX}. Use a neutral, invented setting: no real brands, people or places. Pick the place and contract that match the request; leave the roster modest unless the request asks for more.
+The title is at most ${TITLE_MAX} characters and the brief one sentence of at most ${BRIEF_MAX}. Use a neutral, invented setting: no real brands, people or places. Write the title and the brief like the description of a puzzle-game level: no violence or crime words (avoid steal, rob, sabotage, kill, weapon, hostage, bomb); say retrieve, collect, reach, switch off, get out instead. Pick the place and contract that match the request; leave the roster modest unless the request asks for more.
 If you are given a list of failures from a checker, change exactly those things and keep the rest.`;
 
 /**
@@ -69,8 +72,8 @@ export async function* runDirector(input: DirectorInput, deps: DirectorDeps): As
     yield { type: 'round', n, of: rounds };
     let text = '';
     let failed = false;
-    // Meta's content filter is borderline and not deterministic (the same request passed and failed on different tries, see docs/SPIKES.md), so a rejected call is tried once more.
-    for (let attempt = 0; attempt < 2; attempt++) {
+    // Meta's content filter is borderline and not deterministic (the same request passed and failed on different tries, see docs/SPIKES.md), so a rejected call is tried again.
+    for (let attempt = 0; attempt < FILTER_TRIES; attempt++) {
       try {
         const res = await deps.meta.chat({
           model: deps.meta.models().planner,

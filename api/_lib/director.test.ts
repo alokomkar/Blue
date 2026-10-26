@@ -154,18 +154,24 @@ test('crime words are softened before the request goes out, ordinary words are l
 });
 
 test('a request the model filter rejects ends in the fallback and says so, with the rounds actually used', async () => {
-  const { meta, calls } = scripted([new MetaError('bad_request', 'filtered', 400), new MetaError('bad_request', 'filtered', 400)]);
+  const { meta, calls } = scripted([new MetaError('bad_request', 'filtered', 400), new MetaError('bad_request', 'filtered', 400), new MetaError('bad_request', 'filtered', 400)]);
   const events = await collect(runDirector({ prompt: 'a bank job' }, { meta, generators }));
   const done = events.at(-1)!;
   assert.ok(done.type === 'done' && done.usedFallback && done.reason === 'request_rejected');
   assert.equal(done.type === 'done' && done.rounds, 1);
-  assert.equal(calls.length, 2, 'tried twice');
+  assert.equal(calls.length, 3, 'tried three times');
 });
 
-test('a filtered call is retried once, and a good answer the second time carries on as normal', async () => {
+test('a filtered call is retried, and a good answer the second time carries on as normal', async () => {
   const { meta, calls } = scripted([new MetaError('bad_request', 'filtered', 400), JSON.stringify(spec())]);
   const events = await collect(runDirector({ prompt: 'a bank job' }, { meta, generators, verify: () => ({ ok: true, failures: [] }) }));
   assert.equal(calls.length, 2);
   const done = events.at(-1)!;
   assert.ok(done.type === 'done' && !done.usedFallback && done.rounds === 1);
+});
+
+test('the ready-made levels the page ships (public/fallback/director/levels.json) are in step with the server\'s fallbacks', async () => {
+  const { readFileSync } = await import('node:fs');
+  const file = JSON.parse(readFileSync(new URL('../../public/fallback/director/levels.json', import.meta.url), 'utf8'));
+  assert.deepEqual(file, FALLBACKS, 'run node scripts/build-fallbacks.mjs');
 });

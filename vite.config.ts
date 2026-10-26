@@ -60,7 +60,7 @@ export default defineConfig(({ mode }) => {
       outDir: resolve(root, original ? 'dist-original' : 'dist'),
       emptyOutDir: true,
       sourcemap: false,
-      rollupOptions: { input: { game: resolve(root, 'src/client/game.html') } },
+      rollupOptions: { input: { game: resolve(root, 'src/client/game.html'), director: resolve(root, 'src/client/director.html') } },
     },
   };
 });
