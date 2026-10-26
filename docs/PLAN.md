@@ -184,7 +184,17 @@ displaces a Must item. The co-op work (the AI partner on the tower, bunker and e
 were done on Oct 26, before the building period. They are committed under their real date and tagged
 `pre-hackathon-final`: they are carried-over work, disclosed as such, and everything after that tag is hackathon work.
 
-## 12. Open questions
+## 12. VR later
+
+The application describes a VR action-stealth game; the submission is the web build. The game is three.js, which has
+WebXR support, and it already has a first-person mode (key K), so a Quest-browser version is a port, not a rewrite. What
+it would take: an XR input layer next to the keyboard and touch controls (head look, thumbstick move, trigger fire),
+a camera rig for the first-person view, the HUD and briefing as in-world panels, comfort options (snap turn, vignette),
+and a lighter render profile for the headset. The Meta model calls do not change, and the voice partner suits VR best
+(a microphone and a partner you talk to). Not scheduled for the event; to keep it open, the game logic stays separate from
+input and camera code, and the first-person mode stays working.
+
+## 13. Open questions
 
 - Subdomain name for the hackathon build.
 - Licence for the repo (decide before the first code commit).
