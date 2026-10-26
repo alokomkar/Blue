@@ -70,9 +70,14 @@ async function expectStub(res: Response) {
   assert.deepEqual(await res.json(), { error: 'not_implemented', fallback: true });
 }
 
-test('director: validates, then 501 with fallback', async () => {
+test('director: validates, then streams events; a dead model still ends in a verified fallback level', async () => {
   const h = director({ meta: fakeMeta(), limiter: roomy() });
-  await expectStub(await h(jsonPost('director', { prompt: 'night job at a museum', seed: 7 })));
+  const res = await h(jsonPost('director', { prompt: 'night job at a museum', seed: 7 }));
+  assert.equal(res.status, 200);
+  assert.match(res.headers.get('content-type') ?? '', /text\/event-stream/);
+  const body = await res.text();
+  assert.ok(body.includes('event: done'));
+  assert.ok(body.includes('"usedFallback":true'));
   assert.equal((await h(jsonPost('director', {}))).status, 400);
   assert.equal((await h(jsonPost('director', { prompt: '   ' }))).status, 400);
   assert.equal((await h(jsonPost('director', { prompt: 'x'.repeat(501) }))).status, 413);

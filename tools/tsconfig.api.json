@@ -1,15 +1,15 @@
 {
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    "lib": ["ES2023"],
+    // DOM is here because the server imports the game's generators from src/client (api/_lib/generators.ts); they are
+    // pure at run time, but their imports pull the rest of the client into the type graph, and it uses the DOM types.
+    "lib": ["ES2023", "DOM"],
     "types": ["node"],
-    "outDir": "../dist/types/api",
-    "tsBuildInfoFile": "../dist/types/api/tsconfig.tsbuildinfo",
+    // Checked on its own, not built as a composite project (a composite one must list every file it imports).
+    "composite": false,
+    "noEmit": true,
     "rootDir": "..",
-    "allowImportingTsExtensions": true,
-    "emitDeclarationOnly": true,
-    "erasableSyntaxOnly": true,
-    "verbatimModuleSyntax": true
+    "allowImportingTsExtensions": true
   },
   "include": ["../api/**/*"]
 }

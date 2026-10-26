@@ -17,7 +17,7 @@ import {
 import { wav } from './testing.ts';
 
 const post = (body: string | Uint8Array | null, headers: Record<string, string> = {}) =>
-  new Request('http://localhost/api/ai/x', { method: 'POST', headers, body });
+  new Request('http://localhost/api/ai/x', { method: 'POST', headers, body: body as BodyInit | null });
 const rejects = (p: Promise<unknown> | (() => unknown), status: number, code: string) =>
   assert.rejects(Promise.resolve().then(() => (typeof p === 'function' ? p() : p)), (e) => e instanceof GuardError && e.status === status && e.code === code);
 

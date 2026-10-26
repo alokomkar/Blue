@@ -1,11 +1,14 @@
 // POST /api/ai/director  { prompt: string (<= 500 chars), seed?: uint32 }
-// Stub: validates the request and answers 501 until the Director loop (docs/DESIGN.md section 3) is plugged
-// in as the hook below. The loop will answer a stream of server-sent events (round, spec, verify, done), so
-// the hook may return a streaming Response.
-import { LIMITS, GuardError, parseJson } from '../_lib/guard.ts';
-import { asRecord, createEndpoint, type Deps } from '../_lib/endpoint.ts';
+// Answers a stream of server-sent events (docs/DESIGN.md section 3): `round`, `spec`, `verify` (repeated while the
+// planner repairs its level) and a last `done` carrying the verified LevelSpec, or a verified fallback if the model is
+// unavailable or cannot make a level that passes. A finished request is cached by its content for an hour, so a repeated
+// demo prompt is instant.
+import { LIMITS, GuardError, contentHash, createLruCache, parseJson } from '../_lib/guard.ts';
+import { asRecord, createEndpoint, type Deps, type Hook } from '../_lib/endpoint.ts';
+import { eventStream, runDirector, type DirectorEvent, type DirectorInput } from '../_lib/director.ts';
+import { generators } from '../_lib/generators.ts';
 
-export type DirectorInput = { prompt: string; seed?: number };
+export type { DirectorInput };
 
 export async function parseDirector(request: Request): Promise<DirectorInput> {
   const body = asRecord(await parseJson(request));
@@ -19,6 +22,27 @@ export async function parseDirector(request: Request): Promise<DirectorInput> {
   return { prompt: prompt.trim(), seed };
 }
 
+const STREAM_HEADERS = { 'content-type': 'text/event-stream; charset=utf-8', 'cache-control': 'no-store', 'x-accel-buffering': 'no' };
+
+/** The finished (non-fallback) answers, by request: a repeated prompt costs no model call. */
+const finished = createLruCache<DirectorEvent>({ max: 100, ttlMs: 60 * 60 * 1000 });
+
+export const directorHook: Hook<DirectorInput> = async (input, ctx) => {
+  const key = contentHash('director', input.prompt.toLowerCase(), input.seed ?? null);
+  const hit = finished.get(key);
+  async function* events(): AsyncGenerator<DirectorEvent> {
+    if (hit) {
+      yield hit;
+      return;
+    }
+    for await (const e of runDirector(input, { meta: ctx.meta, generators })) {
+      if (e.type === 'done' && !e.usedFallback) finished.set(key, e);
+      yield e;
+    }
+  }
+  return new Response(eventStream(events()), { status: 200, headers: STREAM_HEADERS });
+};
+
 export function createHandler(deps: Deps<DirectorInput> = {}) {
   return createEndpoint<DirectorInput>(
     {
@@ -26,7 +50,7 @@ export function createHandler(deps: Deps<DirectorInput> = {}) {
       methods: ['POST'],
       rate: { capacity: 5, refillPerSec: 0.1 }, // an agent loop is the costliest call
       parse: parseDirector,
-      // HOOK: the Director loop goes here (planner call, verify V1-V3, repair up to 4 rounds). Until then: 501.
+      defaultHook: directorHook,
     },
     deps,
   );
