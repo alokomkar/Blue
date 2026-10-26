@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, width=device-width, height=device-height, user-scalable=0, viewport-fit=cover" />
+    <title>Blueprint Job</title>
+    <!--
+      Landscape view for a phone held upright. Reddit's app keeps its web views upright and a page can't turn them (the Screen Orientation API is refused there, and
+      Devvit has no setting for it), so this page does the turning itself: the game runs in a frame as wide as the screen is tall, turned a quarter. Inside the frame
+      the game sees a landscape screen (its sizes, its media queries, its touch controls), and a touch on the turned frame arrives in the frame's own coordinates.
+      Turn the phone a quarter anticlockwise and it reads the right way up. If the phone is already sideways the frame just fills the screen.
+      The game says it is up ("ready"); if it never does (a frame this page isn't allowed), a note says so and links back. The game asks to leave with "exit".
+    -->
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: #05060a;
+        color: #e9e3d2;
+        font: 14px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      }
+      iframe {
+        position: fixed;
+        left: 0;
+        top: 0;
+        width: 100vw;
+        width: 100dvw;
+        height: 100vh;
+        height: 100dvh;
+        border: 0;
+        background: #05060a;
+        transform-origin: 0 0;
+      }
+      /* Held upright: a frame as wide as the screen is tall and as tall as it is wide, turned a quarter clockwise about its top left, then slid back onto the screen.
+         Plain CSS, because the page this runs in allows no inline script: landscape.js only listens for the game (and re-fits the size where the browser's bars move). */
+      @media (orientation: portrait) {
+        iframe {
+          width: 100vh;
+          width: 100dvh;
+          height: 100vw;
+          height: 100dvw;
+          transform: translateX(100vw) rotate(90deg);
+          transform: translateX(100dvw) rotate(90deg);
+        }
+      }
+      #note {
+        position: fixed;
+        left: 16px;
+        right: 16px;
+        bottom: 24px;
+        padding: 14px 16px;
+        border: 1.5px solid #e0bd6c;
+        border-radius: 6px;
+        background: #10141b;
+        text-align: center;
+      }
+      #note[hidden] {
+        display: none;
+      }
+      #note a {
+        color: #e0bd6c;
+        font-weight: 700;
+      }
+    </style>
+  </head>
+  <body>
+    <iframe id="game" name="mazeLandscape" src="game.html?inner=1" allow="autoplay; fullscreen" title="Blueprint Job"></iframe>
+    <div id="note" hidden>Landscape view isn’t available here. <a href="game.html">Back to the normal view</a></div>
+    <script src="landscape.js"></script>
+  </body>
+</html>

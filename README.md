@@ -56,9 +56,36 @@ Server functions (Vercel)  ← API key lives here only
 
 The Meta Model API key is never sent to the browser.
 
-## Running it
+## Running the baseline
 
-Not yet runnable. Setup instructions will go here once the standalone build exists.
+Needs Node 22.6 or newer.
+
+```bash
+npm install
+npm run dev        # http://localhost:5173/game.html
+npm run build      # static build in dist/
+npm run test:unit  # unit tests
+npm run test:types # type-check
+```
+
+Level links (the debug links work on localhost only):
+
+| Level | Link | With the AI partner |
+|---|---|---|
+| Maze | `/game.html?job=1` | add `&coop=ai` |
+| Tower | `/game.html?job=tower&n=1` | add `&coop=ai` |
+| Bunker | `/game.html?job=bunker` | add `&coop=ai` |
+| Shootout exit | `/game.html?job=tower&exit=1` | add `&coop=ai` |
+
+The model calls (Meta Model API) will go through serverless functions; the API key is never in the browser. Until
+those exist the game calls `/api/*`, gets nothing back, and carries on.
+
+## Assets
+
+Everything under `public/models` is CC0 (Quaternius) or original work; see
+[`public/models/CREDITS.md`](public/models/CREDITS.md). The live demo may additionally load a private set of
+animations from `public/models/private/`, which is git-ignored and never part of this repo; without it the game uses
+the CC0 clips.
 
 ## Docs
 

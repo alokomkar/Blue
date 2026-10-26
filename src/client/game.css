@@ -1,0 +1,5610 @@
+/* Global resets */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  color: #e7e1cf;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #05060a;
+}
+
+/* The game is not a document: a long press on a button (Fire's hold for the EMP, Sneak's for the camo) must not start a text selection, with Android's Translate / Copy /
+   Select all bar and its handles, or the long-press menu. Fields and the few places that offer text to copy say otherwise for themselves. */
+body {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+input,
+textarea {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* Three.js canvas fills the screen. touch-action:none stops the browser
+   from hijacking touches for page scroll/zoom/pull-to-refresh, which would
+   otherwise compete with the joystick and swallow drag gestures. */
+#bg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+}
+
+/* Overlay container sitting above the canvas — pointer-events:none on the
+   container so clicks/drags reach the canvas by default, pointer-events:auto
+   set explicitly on whichever children are actually interactive. */
+.overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+    env(safe-area-inset-left);
+}
+
+/* ---- top HUD: job label + suspicion meter ---- */
+.hud-top {
+  position: absolute;
+  top: 14px;
+  left: 16px;
+  right: 16px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+}
+
+.job-label {
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #e0bd6c;
+  white-space: nowrap;
+}
+
+.score-label {
+  font-weight: 600;
+  color: #cbd3da;
+  white-space: nowrap;
+}
+
+.documents-label {
+  font-weight: 600;
+  color: #cbd3da;
+  white-space: nowrap;
+}
+
+/* The exit is unlocked — matches scene.ts's own amber "unlocked" exit-marker color, so the HUD and the 3D exit agree at a glance. */
+.documents-label.complete {
+  color: #e0bd6c;
+}
+
+.suspicion-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  max-width: 220px;
+  margin-left: auto;
+}
+
+.alert-chip {
+  flex: none;
+  padding: 2px 7px;
+  border-radius: 3px;
+  font: 700 10px/1.3 ui-monospace, 'IBM Plex Mono', Menlo, Consolas, monospace;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  border: 1px solid currentColor;
+  background: rgba(8, 10, 14, 0.7);
+  color: #ffb02e;
+}
+
+.alert-chip.hidden {
+  display: none;
+}
+
+.alert-chip[data-phase='alert'] {
+  color: #ff4a3d;
+  animation: alert-chip 0.9s ease-in-out infinite;
+}
+
+.alert-chip[data-phase='evasion'] {
+  color: #ff8a3d;
+}
+
+@keyframes alert-chip {
+  50% {
+    background: rgba(120, 18, 12, 0.85);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .alert-chip[data-phase='alert'] {
+    animation: none;
+  }
+}
+
+.hud-icon-btn {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(10, 13, 18, 0.6);
+  color: #cbd3da;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+/* The goggles button carries its battery as a thin bar along its foot. */
+.goggles-btn {
+  position: relative;
+}
+
+/* Phones: the top row has no room to spare (the suspicion bar shrank to a
+   sliver), so the button drops just below the row's right end instead. */
+@media (max-width: 480px) {
+  .hud-icon-btn {
+    position: absolute;
+    top: 30px;
+  }
+  .mute-btn {
+    right: 0;
+  }
+  .map-btn {
+    right: 38px;
+  }
+  .torch-btn {
+    right: 76px;
+  }
+  .goggles-btn {
+    right: 114px;
+  }
+  .trap-btn {
+    right: 152px;
+  }
+  .help-btn {
+    right: 190px;
+  }
+}
+
+.hud-icon-btn:focus-visible {
+  outline: 2px solid #e0bd6c;
+  outline-offset: 2px;
+}
+
+.trap-btn {
+  position: relative;
+}
+
+.trap-count {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  border-radius: 7px;
+  background: #e0bd6c;
+  color: #1a1206;
+  font-size: 9.5px;
+  font-weight: 800;
+  line-height: 14px;
+  text-align: center;
+}
+
+.trap-btn.empty,
+.flash-btn.empty {
+  opacity: 0.45;
+}
+
+.flash-btn {
+  position: relative;
+}
+
+.flash-btn.empty .trap-count {
+  background: #5b636c;
+  color: #0b0e12;
+}
+
+.trap-btn.empty .trap-count {
+  background: #5b636c;
+  color: #0b0e12;
+}
+
+.torch-btn[aria-pressed='true'] {
+  color: #ffe7a8;
+  border-color: rgba(255, 231, 168, 0.55);
+}
+
+.goggles-btn[aria-pressed='true'] {
+  color: #8dff9e;
+  border-color: rgba(141, 255, 158, 0.6);
+  box-shadow: 0 0 8px rgba(141, 255, 158, 0.35);
+}
+
+.goggles-charge {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 4px;
+  height: 2px;
+  border-radius: 1px;
+  background: rgba(255, 255, 255, 0.14);
+  overflow: hidden;
+}
+
+.goggles-fill {
+  display: block;
+  height: 100%;
+  width: 100%;
+  background: #56626d;
+}
+
+.goggles-fill.ready {
+  background: #7fd8a0;
+}
+
+.goggles-fill.on {
+  background: #8dff9e;
+}
+
+.torch-btn[aria-pressed='false'] .torch-rays,
+.torch-btn[aria-pressed='true'] .torch-cross {
+  display: none;
+}
+
+.mute-btn .mute-cross,
+.mute-btn[aria-pressed='true'] .mute-waves {
+  display: none;
+}
+
+.mute-btn[aria-pressed='true'] .mute-cross {
+  display: inline;
+}
+
+.suspicion-caption {
+  font-size: 10.5px;
+  color: #9aa4ad;
+  white-space: nowrap;
+}
+
+.suspicion-bar {
+  flex: 1;
+  height: 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.suspicion-fill {
+  height: 100%;
+  width: 0%;
+  background: #4fb0c6;
+  transition: width 0.25s ease, background-color 0.25s ease;
+}
+
+.suspicion-fill.high {
+  background: #e06a7c;
+}
+
+/* the exit level's health bar: green while it is high, the red above once it runs low */
+.suspicion-fill.health {
+  background: #5ccf8c;
+}
+.suspicion-fill.health.high {
+  background: #e06a7c;
+}
+
+/* ---- hiding in a staff locker: peering out between its vent slats ---- */
+.locker-view {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  background:
+    radial-gradient(ellipse at 50% 45%, transparent 30%, rgba(4, 5, 7, 0.9) 75%),
+    repeating-linear-gradient(to bottom, rgba(10, 12, 15, 0.93) 0 26px, transparent 26px 40px);
+}
+
+.locker-view.on {
+  opacity: 1;
+}
+
+/* ---- the lift ride between jobs: a black screen over the scene ---- */
+.fade-screen {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.7s ease;
+}
+
+.fade-screen.on {
+  opacity: 1;
+}
+
+/* ---- mission briefing: shown once before Job 1 ---- */
+.brief-card {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(440px, 90vw);
+  max-height: min(600px, 84vh);
+  overflow-y: auto;
+  background: rgba(10, 13, 18, 0.96);
+  border: 1px solid #e0bd6c;
+  border-radius: 8px;
+  padding: 22px 22px 20px;
+  pointer-events: auto;
+  text-align: left;
+}
+
+.brief-card.hidden {
+  display: none;
+}
+
+.brief-title {
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #e0bd6c;
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+.brief-section {
+  margin-bottom: 14px;
+}
+
+.brief-heading {
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #e0bd6c;
+  margin-bottom: 4px;
+}
+
+.brief-section p {
+  font-size: 13px;
+  line-height: 1.5;
+  color: #cbd3da;
+}
+
+.brief-controls {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+.brief-controls td {
+  padding: 5px 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  color: #cbd3da;
+}
+
+.brief-controls tr:first-child td {
+  border-top: none;
+}
+
+.brief-controls td:first-child {
+  color: #e7e1cf;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* ---- a new agent's welcome, at the top of the brief ---- */
+.brief-welcome {
+  margin: 4px 0 18px;
+  padding: 14px 16px 12px;
+  border: 1px solid rgba(224, 189, 108, 0.35);
+  border-radius: 4px;
+  background: #10141b;
+}
+
+.brief-welcome[hidden] {
+  display: none;
+}
+
+.brief-welcome-kicker {
+  font: 600 10.5px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #e0bd6c;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(224, 189, 108, 0.35);
+  margin-bottom: 12px;
+}
+
+.brief-welcome p {
+  margin: 0 0 10px;
+  font: 400 15px/1.55 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+  color: #e9e3d2;
+  text-wrap: pretty;
+}
+
+.brief-welcome .brief-welcome-greeting {
+  font-size: 19px;
+  font-weight: 600;
+}
+
+.brief-welcome .brief-welcome-sign {
+  margin: 0;
+  text-align: right;
+  font-style: italic;
+  font-weight: 600;
+  color: #e0bd6c;
+}
+
+.brief-essentials {
+  margin: 4px 0 8px;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #cbd3da;
+}
+
+.brief-link {
+  padding: 4px 0;
+  border: none;
+  background: none;
+  font: 700 12.5px/1.2 inherit;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  color: #e0bd6c;
+  cursor: pointer;
+}
+
+.brief-link:focus-visible {
+  outline: 2px solid #e0bd6c;
+  outline-offset: 2px;
+}
+
+.brief-daily-note {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: #ffb36b;
+}
+
+.brief-daily-note[hidden] {
+  display: none;
+}
+
+/* ---- today's Daily Heist, at the top of the brief ---- */
+.brief-daily {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 16px;
+  padding: 12px 14px 14px;
+  border: 1px solid rgba(224, 189, 108, 0.45);
+  border-radius: 6px;
+  background: rgba(224, 189, 108, 0.06);
+}
+
+.brief-daily[hidden] {
+  display: none;
+}
+
+.brief-daily-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.brief-daily-name {
+  font: 700 12px/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #e0bd6c;
+}
+
+.brief-daily-job {
+  font: 600 11px/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: 0.08em;
+  color: #9aa4ad;
+}
+
+.brief-daily-line,
+.brief-daily-status,
+.brief-daily-streak {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: #cbd3da;
+}
+
+.brief-daily-status {
+  color: #e7e1cf;
+  font-weight: 600;
+}
+
+.brief-daily-streak {
+  color: #ffb36b;
+  font-weight: 600;
+}
+
+.brief-daily .btn {
+  margin-top: 4px;
+}
+
+/* ---- agent pick, at the top of the brief ---- */
+.agent-pick {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.agent-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 0 0 9px;
+  border: 1px solid rgba(224, 189, 108, 0.25);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.03);
+  color: #cbd3da;
+  font: inherit;
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.agent-card:hover {
+  border-color: rgba(224, 189, 108, 0.55);
+}
+
+.agent-card:focus-visible {
+  outline: 2px solid #e0bd6c;
+  outline-offset: 2px;
+}
+
+.agent-card[aria-checked='true'] {
+  border-color: #e0bd6c;
+  background: rgba(224, 189, 108, 0.08);
+  box-shadow: inset 0 0 0 1px #e0bd6c;
+}
+
+.agent-portrait {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  margin-bottom: 6px;
+  background: radial-gradient(ellipse at 50% 40%, #1d2a38 0%, #0b1017 70%);
+}
+
+.agent-portrait img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.agent-portrait img.ready {
+  opacity: 1;
+}
+
+.agent-name {
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #f1ead8;
+}
+
+.agent-card[aria-checked='true'] .agent-name {
+  color: #e0bd6c;
+}
+
+.agent-role {
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #8e99a3;
+}
+
+/* The look: their own clothes, or a bodysuit. */
+.look-heading {
+  margin: 12px 0 6px;
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #8e99a3;
+}
+
+.look-pick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.look-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px 5px 6px;
+  border: 1px solid rgba(224, 189, 108, 0.25);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.03);
+  color: #cbd3da;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.look-chip:hover {
+  border-color: rgba(224, 189, 108, 0.55);
+}
+
+.look-chip:focus-visible {
+  outline: 2px solid #e0bd6c;
+  outline-offset: 2px;
+}
+
+.look-chip[aria-checked='true'] {
+  border-color: #e0bd6c;
+  background: rgba(224, 189, 108, 0.1);
+  color: #e0bd6c;
+}
+
+/* The look at a glance: the suit, ringed in skin. */
+.look-swatch {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--armour) 0 50%, var(--suit) 50% 100%);
+  box-shadow: 0 0 0 2px var(--trim);
+}
+
+.look-swatch.suit {
+  background: var(--suit);
+  box-shadow: 0 0 0 2px #c9956b;
+}
+
+.look-swatch.classic {
+  background: linear-gradient(135deg, #7d8792 0 50%, #2a2f36 50% 100%);
+  box-shadow: 0 0 0 2px #4a525c;
+}
+
+/* Pinned to the bottom of the card, so the way in shows before the brief is read. */
+.brief-actions {
+  position: sticky;
+  bottom: -20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 6px -22px -20px;
+  padding: 12px 22px 18px;
+  background: linear-gradient(to bottom, rgba(10, 13, 18, 0), #0a0d12 14px);
+}
+
+.btn-secondary {
+  background: transparent;
+  color: #e0bd6c;
+  border-color: rgba(224, 189, 108, 0.5);
+}
+
+.btn:focus-visible {
+  outline: 2px solid #e0bd6c;
+  outline-offset: 2px;
+}
+
+/* While the blueprint or the report is up, the play controls and gauges
+   step aside (the touch controls sit above the whole overlay otherwise). */
+body.modal-open .touch-controls,
+body.modal-open .flash-prompt,
+body.modal-open .grenade-prompt,
+body.modal-open .bullet-prompt,
+body.modal-open .weapon-status,
+body.modal-open .hack-status,
+body.map-open .toast-stack {
+  visibility: hidden;
+}
+
+/* ---- blueprint: a drafting sheet over the paused game ---- */
+.map-card {
+  --bp-paper: #0b2542;
+  --bp-line: rgba(140, 200, 255, 0.28);
+  --bp-ink: #dcecff;
+  --bp-label: #a9cdf0;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+  position: absolute;
+  inset: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom))
+    max(12px, env(safe-area-inset-left));
+  max-width: 1000px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  background: var(--bp-paper);
+  border: 1px solid var(--bp-line);
+  border-radius: 6px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  pointer-events: auto;
+  overflow: hidden;
+}
+
+.map-card.hidden {
+  display: none;
+}
+
+/* The controls sheet: blueprint paper, below the top bar (so its buttons, ? included, stay in reach), sized to its table. */
+.help-card {
+  top: calc(env(safe-area-inset-top) + 52px);
+  bottom: auto;
+  max-width: 560px;
+  max-height: calc(100% - 64px - env(safe-area-inset-top));
+}
+
+@media (max-width: 480px) {
+  .help-card {
+    top: calc(env(safe-area-inset-top) + 82px);
+    max-height: calc(100% - 94px - env(safe-area-inset-top));
+  }
+}
+
+.help-title {
+  flex: 1;
+  margin: 0;
+  font: 600 12px/1 var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--bp-ink);
+}
+
+.help-body {
+  overflow-y: auto;
+  padding: 6px 14px 12px;
+}
+
+.help-body .brief-controls td {
+  border-top-color: var(--bp-line);
+  color: var(--bp-label);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.help-body .brief-controls td:first-child {
+  color: var(--bp-ink);
+  font-family: inherit;
+  font-size: 12.5px;
+  white-space: normal;
+}
+
+/* The field manual, on blueprint paper. */
+.help-manual .brief-section {
+  margin-bottom: 14px;
+}
+
+.help-manual .brief-heading {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: var(--bp-ink);
+}
+
+.help-manual .brief-section p {
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--bp-label);
+}
+
+.help-body[hidden],
+.map-paused[hidden] {
+  display: none;
+}
+
+/* Only this device's column: keys on a keyboard, buttons on a touch screen. */
+@media (pointer: fine) {
+  .help-body .brief-controls td:nth-child(3) {
+    display: none;
+  }
+}
+
+@media (pointer: coarse) {
+  .help-body .brief-controls td:nth-child(2) {
+    display: none;
+  }
+}
+
+.map-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 8px 8px 12px;
+  border-bottom: 1px solid var(--bp-line);
+}
+
+.map-tabs {
+  display: flex;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.map-tab {
+  font: 600 11px/1 var(--mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--bp-label);
+  background: transparent;
+  border: 1px solid var(--bp-line);
+  border-radius: 3px;
+  padding: 7px 10px;
+  cursor: pointer;
+}
+
+.map-tab[aria-selected='true'] {
+  color: var(--bp-paper);
+  background: var(--bp-ink);
+  border-color: var(--bp-ink);
+}
+
+.map-tab:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.map-tab:focus-visible,
+.map-close:focus-visible {
+  outline: 2px solid #e0bd6c;
+  outline-offset: 2px;
+}
+
+.map-paused {
+  font: 600 10px/1 var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #e0bd6c;
+}
+
+.map-music {
+  flex: none;
+  font: 600 10.5px/1 var(--mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--bp-label);
+  background: transparent;
+  border: 1px solid var(--bp-line);
+  border-radius: 3px;
+  padding: 7px 9px;
+  cursor: pointer;
+}
+
+.map-music[aria-pressed='true'] {
+  color: var(--bp-paper);
+  background: #e0bd6c;
+  border-color: #e0bd6c;
+}
+
+.map-music:focus-visible {
+  outline: 2px solid #e0bd6c;
+  outline-offset: 2px;
+}
+
+/* The pause sheet's way out of a job: quiet until tapped once, then red to confirm. */
+.help-abandon {
+  margin-left: 10px;
+  padding: 5px 10px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 106, 94, 0.45);
+  background: transparent;
+  color: #ff9a90;
+  font: inherit;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.help-abandon.armed {
+  background: #c8433a;
+  border-color: #c8433a;
+  color: #fff;
+}
+
+.help-abandon:focus-visible {
+  outline: 2px solid #e0bd6c;
+  outline-offset: 2px;
+}
+
+.map-close {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  color: var(--bp-ink);
+  background: transparent;
+  border: 1px solid var(--bp-line);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.map-canvas {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  display: block;
+  touch-action: none; /* drag pans and pinch zooms the sheet, not the page */
+  cursor: grab;
+}
+
+.map-tab span {
+  color: inherit;
+  font: inherit;
+}
+
+@media (max-width: 480px) {
+  .map-tab-name,
+  .map-paused {
+    display: none;
+  }
+}
+
+.map-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px 16px;
+  padding: 10px 12px 12px;
+  border-top: 1px solid var(--bp-line);
+}
+
+.map-legend {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  font: 500 10.5px/1.2 var(--mono);
+  color: var(--bp-label);
+}
+
+.map-legend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--bp-label);
+}
+
+.lg {
+  display: inline-block;
+  flex: none;
+}
+
+.lg-door {
+  width: 14px;
+  height: 4px;
+  background: #4ee08a;
+}
+
+.lg-ring {
+  width: 11px;
+  height: 11px;
+  border: 2px solid #c27bff;
+  border-radius: 50%;
+}
+
+.lg-laser {
+  width: 14px;
+  border-top: 2px dashed #ff6464;
+}
+
+.lg-crate {
+  width: 9px;
+  height: 9px;
+  border: 1px solid var(--bp-label);
+  background: linear-gradient(135deg, transparent 45%, var(--bp-label) 45% 55%, transparent 55%);
+}
+
+.lg-hideout {
+  width: 7px;
+  height: 11px;
+  border: 1px solid var(--bp-label);
+}
+
+.lg-pack {
+  width: 11px;
+  height: 11px;
+  border: 1.5px dashed #ff9a3c; /* a watchdog's visor */
+  border-radius: 50%;
+}
+
+.lg-breaker {
+  width: 10px;
+  height: 10px;
+  border: 1.5px solid #e0bd6c;
+}
+
+.lg-dark {
+  width: 11px;
+  height: 11px;
+  background: repeating-linear-gradient(45deg, rgba(140, 200, 255, 0.35) 0 1px, rgba(2, 8, 18, 0.8) 1px 4px);
+  border: 1px solid rgba(140, 200, 255, 0.25);
+}
+
+.lg-vent {
+  width: 10px;
+  height: 10px;
+  border: 1px solid var(--bp-label);
+  background: repeating-linear-gradient(to bottom, transparent 0 2px, var(--bp-label) 2px 3px);
+}
+
+.lg-you {
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-bottom: 10px solid #e0bd6c;
+}
+
+/* The drawing's title block, as on a real architectural sheet. */
+.title-block {
+  display: grid;
+  grid-template-columns: repeat(4, auto);
+  border: 1px solid var(--bp-line);
+  font-family: var(--mono);
+}
+
+.title-block div {
+  padding: 4px 8px;
+  border-left: 1px solid var(--bp-line);
+}
+
+.title-block div:first-child {
+  border-left: 0;
+}
+
+.title-block dt {
+  font-size: 8.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--bp-label);
+  opacity: 0.75;
+}
+
+.title-block dd {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--bp-ink);
+  white-space: nowrap;
+}
+
+@media (max-width: 480px) {
+  .title-block {
+    grid-template-columns: repeat(2, auto);
+  }
+  .title-block div:nth-child(3) {
+    border-left: 0;
+  }
+  .title-block div:nth-child(n + 3) {
+    border-top: 1px solid var(--bp-line);
+  }
+}
+
+/* ---- end-of-job report ---- */
+/* ---- the handler's messages: a classified letter ---- */
+.dossier {
+  --paper: #10141b;
+  --ink: #e9e3d2;
+  --ink-muted: #a8a293;
+  --rule: rgba(224, 189, 108, 0.35);
+  --serif: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 5; /* over the report card, which the debrief opens onto */
+  width: min(460px, 92vw);
+  max-height: 88vh;
+  overflow-y: auto;
+  padding: 18px 24px 20px;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.7);
+  color: var(--ink);
+  pointer-events: auto;
+}
+
+.dossier.hidden {
+  display: none;
+}
+
+.dossier-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.dossier-kicker {
+  font: 600 10.5px/1.5 var(--mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #e0bd6c;
+}
+
+.dossier-stamp {
+  flex: none;
+  padding: 3px 8px;
+  border: 1.5px solid #d4574a;
+  border-radius: 3px;
+  font: 700 10px/1 var(--mono);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #d4574a;
+  transform: rotate(4deg);
+}
+
+.dossier-greeting {
+  margin: 16px 0 10px;
+  font: 600 21px/1.3 var(--serif);
+  text-wrap: balance;
+}
+
+.dossier-body p {
+  margin: 0 0 10px;
+  font: 400 15.5px/1.6 var(--serif);
+  text-wrap: pretty;
+}
+
+/* Notes from Control that change the rules for the job: boxed in the letter's amber, so none is missed. */
+.dossier-notes {
+  display: grid;
+  gap: 8px;
+  margin: 4px 0 6px;
+}
+
+.dossier-notes[hidden] {
+  display: none;
+}
+
+.dossier-note {
+  padding: 9px 12px 10px;
+  border: 1.5px solid #e0bd6c;
+  border-radius: 3px;
+  background: rgba(224, 189, 108, 0.09);
+}
+
+.dossier-note-label {
+  margin-bottom: 4px;
+  font: 700 10.5px/1.2 var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #e0bd6c;
+}
+
+.dossier-note p {
+  margin: 0;
+  font: 400 14px/1.5 var(--serif);
+  text-wrap: pretty;
+}
+
+.dossier-params-title {
+  margin-top: 14px;
+  font: 600 10.5px/1 var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.dossier-params {
+  margin: 8px 0 14px;
+  padding: 0;
+  list-style: none;
+  counter-reset: param;
+  border-top: 1px solid var(--rule);
+}
+
+.dossier-params li {
+  counter-increment: param;
+  display: flex;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--rule);
+  font: 400 14.5px/1.4 var(--serif);
+}
+
+.dossier-params li::before {
+  content: counter(param);
+  flex: none;
+  width: 18px;
+  font: 700 12px/1.6 var(--mono);
+  color: #e0bd6c;
+}
+
+/* In the debrief each parameter is marked met or missed. */
+.dossier-params li.met::before,
+.dossier-params li.missed::before {
+  font-size: 14px;
+  line-height: 1.3;
+}
+
+.dossier-params li.met::before {
+  content: '✓';
+  color: #7fd89a;
+}
+
+.dossier-params li.missed::before {
+  content: '✗';
+  color: #e0786b;
+}
+
+.dossier-closing {
+  margin: 0 0 6px;
+  font: italic 400 15px/1.55 var(--serif);
+  color: var(--ink);
+}
+
+.dossier-sign {
+  margin: 0 0 14px;
+  text-align: right;
+  font: italic 600 17px/1 var(--serif);
+  color: #e0bd6c;
+}
+
+.dossier-case {
+  margin: 0 0 14px;
+  padding: 8px 10px;
+  border-left: 2px solid #e0bd6c;
+  font: 500 12px/1.5 var(--mono);
+  color: var(--ink-muted);
+}
+
+.dossier-case[hidden] {
+  display: none;
+}
+
+/* The way in: a card per option, the picked one lit. */
+.dossier-entries {
+  margin-top: 14px;
+}
+
+.dossier-entries[hidden] {
+  display: none;
+}
+
+.dossier-entry-list {
+  display: grid;
+  gap: 8px;
+}
+
+.dossier-entry {
+  display: grid;
+  gap: 3px;
+  padding: 10px 12px;
+  text-align: left;
+  border-radius: 6px;
+  border: 1px solid rgba(231, 225, 207, 0.22);
+  background: rgba(255, 255, 255, 0.03);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.dossier-entry[aria-checked='true'] {
+  border-color: #e0bd6c;
+  background: rgba(224, 189, 108, 0.12);
+}
+
+.dossier-entry:focus-visible {
+  outline: 2px solid #e0bd6c;
+  outline-offset: 2px;
+}
+
+.dossier-entry-title {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #e0bd6c;
+}
+
+.dossier-entry-blurb {
+  font-size: 13px;
+  line-height: 1.4;
+  opacity: 0.85;
+}
+
+.dossier-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dossier-actions .btn[hidden] {
+  display: none;
+}
+
+.brief-daily-op {
+  margin: 0;
+  font: italic 500 14px/1.4 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+  color: #e7e1cf;
+}
+
+.report-card {
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(380px, 90vw);
+  max-height: 88vh;
+  overflow-y: auto;
+  background: rgba(10, 13, 18, 0.96);
+  border: 1px solid #e0bd6c;
+  border-radius: 8px;
+  padding: 18px 20px 18px;
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.report-card.hidden {
+  display: none;
+}
+
+.report-card.failed {
+  border-color: #e06a7c;
+}
+
+.report-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.report-kicker {
+  font: 600 10.5px/1 var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #9aa4ad;
+  margin-bottom: 6px;
+}
+
+.report-title {
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #e0bd6c;
+}
+
+.report-card.failed .report-title {
+  color: #e06a7c;
+}
+
+/* The grade, as an inspector's stamp. */
+.report-stamp {
+  --stamp: #e0bd6c;
+  flex: none;
+  width: 72px;
+  height: 72px;
+  border: 3px double var(--stamp);
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transform: rotate(-9deg);
+  color: var(--stamp);
+}
+
+.report-stamp[data-grade='B'] {
+  --stamp: #6fe0ff;
+}
+
+.report-stamp[data-grade='C'],
+.report-stamp[data-grade='D'] {
+  --stamp: #9aa4ad;
+}
+
+.report-stamp[data-grade='fail'] {
+  --stamp: #e06a7c;
+}
+
+.report-grade {
+  font-size: 30px;
+  font-weight: 900;
+  line-height: 1;
+  color: var(--stamp);
+}
+
+.report-stamp[data-grade='pass'] {
+  --stamp: #4ee08a;
+}
+
+.report-stamp[data-grade='fail'] .report-grade,
+.report-stamp[data-grade='pass'] .report-grade {
+  font-size: 13px;
+  letter-spacing: 0.08em;
+}
+
+.report-stamp-label {
+  font: 700 8.5px/1 var(--mono);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  margin-top: 4px;
+  color: var(--stamp);
+}
+
+.report-note {
+  font-size: 13px;
+  line-height: 1.45;
+  color: #cbd3da;
+  margin-top: -4px;
+}
+
+.report-note:empty {
+  display: none;
+}
+
+.report-stats {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  font-size: 13px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.report-stats dt,
+.report-stats dd {
+  padding: 7px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.report-stats dt {
+  color: #9aa4ad;
+}
+
+.report-stats dd {
+  text-align: right;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  color: #e7e1cf;
+}
+
+.report-points {
+  font: 700 13px/1.3 var(--mono);
+  letter-spacing: 0.04em;
+  color: #e0bd6c;
+  text-align: center;
+}
+
+.report-points:empty,
+.report-board.hidden {
+  display: none;
+}
+
+.report-board-title {
+  font: 600 10.5px/1 var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #9aa4ad;
+  margin-bottom: 6px;
+}
+
+.report-board-list {
+  list-style: none;
+  font-size: 13px;
+}
+
+.report-board-list li {
+  display: grid;
+  grid-template-columns: 26px 1fr auto auto;
+  gap: 10px;
+  align-items: baseline;
+  padding: 5px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.report-board-list li.you {
+  color: #e0bd6c;
+}
+
+.report-board-list li span {
+  color: inherit;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.report-board-list .num {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.report-board-note {
+  font-size: 12px;
+  color: #9aa4ad;
+  margin-top: 8px;
+}
+
+.report-board-note:empty {
+  display: none;
+}
+
+.report-continue {
+  align-self: stretch;
+}
+
+.report-continue[hidden],
+.report-feel[hidden] {
+  display: none;
+}
+
+/* How the job felt: three quiet buttons under the result. */
+.report-feel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+}
+
+.report-feel-q {
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: #b9b3a1;
+}
+
+.report-feel-btns {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.report-feel-btns .btn {
+  padding: 7px 12px;
+  font-size: 12px;
+}
+
+.report-share[hidden] {
+  display: none;
+}
+
+/* A daily run's share line and its copy button. */
+.report-share {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px dashed rgba(224, 189, 108, 0.45);
+  border-radius: 6px;
+}
+
+.report-share-text {
+  font: 500 12px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: #e7e1cf;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+.report-share-btn {
+  align-self: flex-end;
+  padding: 8px 14px;
+}
+
+.btn {
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  border-radius: 4px;
+  padding: 10px 18px;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.btn-primary {
+  background: #e0bd6c;
+  color: #1a1206;
+  border-color: #e0bd6c;
+}
+
+/* ---- weapon recharge indicator: always visible (desktop included), see
+   game.html's comment for why ---- */
+.weapon-status {
+  position: absolute;
+  /* Clears the joystick (116px) plus the sidestep/peek pad stacked above it
+     rather than sharing either's row — on a 375px phone this bar's
+     label+pill is wide enough to reach over both. Horizontally it stays
+     clear of the right-hand button column, so this row is free. */
+  bottom: calc(max(30px, env(safe-area-inset-bottom)) + 204px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: rgba(10, 13, 18, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 20px;
+  pointer-events: none;
+}
+
+.weapon-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #9aa4ad;
+  white-space: nowrap;
+}
+
+.weapon-bar {
+  width: 52px;
+  height: 7px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.weapon-fill {
+  height: 100%;
+  width: 0%;
+  background: #6fe0ff;
+}
+
+/* Bright amber (this game's existing "ready/go" accent — exit marker,
+   hiding-spot stripe, primary buttons) once fully recharged, instead of the
+   cyan mid-recharge tone — a clear, colour-coded "you can fire now" cue at
+   a glance, not just a full bar. Width is always set inline (hud.ts), this
+   only swaps the color. */
+.weapon-fill.ready {
+  background: #e0bd6c;
+}
+
+/* Phones: the pill sits left, clear of the right-hand button column
+   (Flare). On a touch phone the camo battery is already on the Sneak
+   button, so the pill drops its camo gauge to leave room for the gun's
+   label and EMP count. */
+@media (max-width: 480px) {
+  .weapon-status {
+    left: 16px;
+    transform: none;
+  }
+}
+
+.camo-gauge {
+  display: contents;
+}
+
+/* Grip: the strength a grapple hang runs on. The sweat drop swells (--sweat, 0 to 1) as the arms tire, and shakes. */
+.strain[hidden] {
+  display: none;
+}
+
+.strain {
+  --sweat: 0;
+  position: absolute;
+  bottom: calc(max(30px, env(safe-area-inset-bottom)) + 248px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: rgba(10, 13, 18, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 20px;
+  pointer-events: none;
+}
+
+body.modal-open .strain {
+  visibility: hidden;
+}
+
+.strain-drop {
+  width: 10px;
+  height: 10px;
+  background: #bfe3ff;
+  border-radius: 0 50% 50% 50%;
+  transform: rotate(45deg) scale(calc(0.7 + var(--sweat) * 0.9));
+  box-shadow: 0 0 6px rgba(160, 210, 255, 0.6);
+}
+
+.strain-fill {
+  height: 100%;
+  width: 100%;
+  border-radius: 3px;
+  background: #7ed0ff;
+  transform-origin: left center;
+  transform: scaleX(var(--fill, 1));
+}
+
+.strain.tired .strain-fill {
+  background: #ff6a4a;
+}
+
+.strain.tired .strain-drop {
+  background: #ffd0c0;
+  animation: sweat-shake 0.25s linear infinite;
+}
+
+@keyframes sweat-shake {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  25% {
+    translate: -1.5px 1px;
+  }
+  75% {
+    translate: 1.5px -1px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .strain.tired .strain-drop {
+    animation: none;
+  }
+}
+
+@media (max-width: 480px) and (pointer: coarse) {
+  .camo-gauge {
+    display: none;
+  }
+}
+
+.weapon-bar > span {
+  display: block;
+}
+
+/* The gun's pick shows in the gauge label: cyan when the next shot is an
+   EMP, dimmed red when the target needs one and there's none left. */
+.weapon-label.emp {
+  color: #6fe0ff;
+}
+
+.weapon-label.takedown {
+  color: #ffffff;
+}
+
+.weapon-label.no-emp {
+  color: #e06a7c;
+}
+
+.emp-count {
+  font-size: 11px;
+  font-weight: 800;
+  color: #6fe0ff;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.emp-count.empty {
+  color: #56626d;
+}
+
+/* Camo battery: grey while too low to start, pale teal once it can, bright
+   cyan while the cloak is on and draining. */
+.camo-label {
+  margin-left: 6px;
+}
+
+.camo-fill {
+  height: 100%;
+  width: 100%;
+  background: #56626d;
+}
+
+.camo-fill.ready {
+  background: #7fd8c4;
+}
+
+.camo-fill.active {
+  background: #6fe0ff;
+  box-shadow: 0 0 8px #6fe0ff;
+}
+
+/* ---- a body's visibility meter, floating over it ---- */
+.body-meters {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.body-meter {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 7px 4px;
+  background: rgba(8, 11, 14, 0.78);
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  font-variant-numeric: tabular-nums;
+  text-transform: uppercase;
+  white-space: nowrap;
+  --meter: #ffb347;
+  color: var(--meter);
+}
+
+.body-meter-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* Says what the percentage is: how likely a guard passing by is to spot the body. */
+.body-meter-cap {
+  font-size: 8.5px;
+  letter-spacing: 0.14em;
+  color: #cfd6dc;
+}
+
+.body-meter[hidden],
+body.map-open .body-meters,
+body.modal-open .body-meters {
+  display: none;
+}
+
+.body-meter[data-level='low'] {
+  --meter: #4ee08a;
+}
+.body-meter[data-level='high'],
+.body-meter[data-level='found'] {
+  --meter: #ff6a5e;
+}
+
+.body-meter-bar {
+  width: 34px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.14);
+  overflow: hidden;
+}
+
+.body-meter-bar i {
+  display: block;
+  height: 100%;
+  background: var(--meter);
+}
+
+/* ---- the agent's PDA: the heist loop's checklist ---- */
+.pda {
+  position: absolute;
+  top: calc(env(safe-area-inset-top) + 52px);
+  left: max(16px, env(safe-area-inset-left));
+  width: 164px;
+  padding: 7px 10px 8px;
+  background: rgba(8, 14, 12, 0.86);
+  border: 1px solid rgba(78, 224, 138, 0.35);
+  border-radius: 8px 8px 8px 2px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: #cfe9da;
+  font-variant-numeric: tabular-nums;
+}
+
+.pda.hidden,
+.pda-shot.hidden,
+body.training .pda,
+body.map-open .pda,
+body.modal-open .pda {
+  display: none;
+}
+
+.pda-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 5px;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: #6fcf97;
+}
+
+/* Phones: the top row's icon buttons drop below it (see .hud-icon-btn), so the PDA sits under them. */
+@media (max-width: 480px) {
+  .pda {
+    top: calc(env(safe-area-inset-top) + 82px);
+  }
+}
+
+/* On a touch screen the PDA can be minimised to a small chip (files so far, and a dot that says if anything needs the agent); it opens by itself for a few seconds when something changes, and the + / – button pins it open or minimises it (hud.ts). */
+.pda-chip,
+.pda-toggle {
+  display: none;
+}
+
+body.touch-ui .pda {
+  width: 188px;
+}
+
+body.touch-ui .pda-signal {
+  display: none;
+}
+
+/* The three buttons are their icons only, whatever the width, so the minimise button fits in the header. */
+body.touch-ui .pda-msg span {
+  display: none;
+}
+
+body.touch-ui .pda-msg {
+  padding: 4px 9px;
+}
+
+body.touch-ui .pda-msg svg {
+  width: 16px;
+  height: 12px;
+}
+
+body.touch-ui .pda-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 24px;
+  margin-left: 4px;
+  padding: 0;
+  border: 1px solid rgba(111, 207, 151, 0.45);
+  border-radius: 4px;
+  background: transparent;
+  color: #6fcf97;
+  font: inherit;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+body.touch-ui .pda-toggle::before {
+  content: '–';
+}
+
+body.touch-ui .pda.collapsed .pda-toggle::before {
+  content: '+';
+}
+
+body.touch-ui .pda.collapsed {
+  width: auto;
+  padding: 4px 6px 4px 9px;
+  border-radius: 8px;
+}
+
+body.touch-ui .pda.collapsed .pda-head {
+  margin-bottom: 0;
+  justify-content: flex-start;
+  gap: 6px;
+}
+
+body.touch-ui .pda.collapsed .pda-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: 2px;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: #cfe9da;
+}
+
+body.touch-ui .pda.collapsed .pda-chip::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #6b7a73;
+}
+
+body.touch-ui .pda.collapsed[data-alert='done'] .pda-chip::before {
+  background: #4ee08a;
+}
+
+body.touch-ui .pda.collapsed[data-alert='alert'] .pda-chip::before {
+  background: #ffb347;
+}
+
+body.touch-ui .pda.collapsed[data-alert='urgent'] .pda-chip::before {
+  background: #ff5a4e;
+  animation: pda-blink 0.8s steps(2, jump-none) infinite;
+}
+
+body.touch-ui .pda.collapsed .pda-msg,
+body.touch-ui .pda.collapsed .pda-list,
+body.touch-ui .pda.collapsed .pda-next,
+body.touch-ui .pda.collapsed .pda-shot {
+  display: none;
+}
+
+/* The brief, read again mid-job (L). */
+.pda-msg {
+  margin-left: auto;
+  margin-right: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border: 1px solid rgba(111, 207, 151, 0.45);
+  border-radius: 4px;
+  background: transparent;
+  color: #6fcf97;
+  font: inherit;
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+/* Recon sits beside it; the pair share the header's free space. */
+.pda-recon {
+  margin-right: 4px;
+}
+
+/* Phones: the panel's too narrow for two labelled buttons, so both are just their icons (bigger to tap). */
+@media (max-width: 480px) {
+  .pda-msg span {
+    display: none;
+  }
+
+  .pda-msg {
+    padding: 4px 9px;
+  }
+
+  .pda-msg svg {
+    width: 16px;
+    height: 12px;
+  }
+}
+
+.help-setting {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 200, 87, 0.35);
+  border-radius: 6px;
+  color: #e7e1cf;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.help-setting input {
+  width: 20px;
+  height: 20px;
+  margin: 1px 0 0;
+  accent-color: #ffc857;
+  flex: none;
+}
+
+.help-setting small {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  color: #9aa4ad;
+}
+
+.pda-recon + .pda-msg,
+.pda-recon + .pda-recon {
+  margin-left: 0;
+}
+
+/* Guide on: lit, like a toggle that's down. */
+#pda-guide[aria-pressed='true'] {
+  background: rgba(255, 200, 87, 0.16);
+  border-color: rgba(255, 200, 87, 0.7);
+  color: #ffc857;
+}
+
+/* The next objective, and how far: one line under the PDA's list. */
+.pda-next {
+  margin-top: 6px;
+  padding-top: 5px;
+  border-top: 1px solid rgba(111, 207, 151, 0.25);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #ffc857;
+}
+
+.pda-next.hidden {
+  display: none;
+}
+
+.pda-msg:hover,
+.pda-msg:focus-visible {
+  background: rgba(111, 207, 151, 0.14);
+  outline: none;
+}
+
+.pda-signal {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 8px;
+}
+
+.pda-signal i {
+  width: 3px;
+  background: #6fcf97;
+  opacity: 0.8;
+}
+.pda-signal i:nth-child(1) { height: 3px; }
+.pda-signal i:nth-child(2) { height: 5px; }
+.pda-signal i:nth-child(3) { height: 8px; }
+
+.pda-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.pda-list li.hidden {
+  display: none;
+}
+.pda-list li {
+  display: grid;
+  grid-template-columns: 8px 1fr auto;
+  align-items: center;
+  gap: 7px;
+}
+
+.pda-list b {
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+}
+
+.pda-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: 1px solid #6b7a73;
+}
+
+.pda-list li[data-state='done'] .pda-dot {
+  background: #4ee08a;
+  border-color: #4ee08a;
+}
+.pda-list li[data-state='done'] b {
+  color: #4ee08a;
+}
+.pda-list li[data-state='todo'] b {
+  color: #9aa4ad;
+}
+.pda-list li[data-state='alert'] .pda-dot {
+  background: #ffb347;
+  border-color: #ffb347;
+}
+.pda-list li[data-state='alert'] b {
+  color: #ffb347;
+}
+.pda-list li[data-state='urgent'] .pda-dot {
+  background: #ff5a4e;
+  border-color: #ff5a4e;
+  animation: pda-blink 0.8s steps(2, jump-none) infinite;
+}
+.pda-list li[data-state='urgent'] b {
+  color: #ff7a6e;
+}
+
+@keyframes pda-blink {
+  to {
+    opacity: 0.25;
+  }
+}
+
+.pda-shot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 7px;
+  padding-top: 7px;
+  border-top: 1px solid rgba(111, 207, 151, 0.25);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #4ee08a;
+}
+
+.pda-page {
+  width: 26px;
+  height: 34px;
+  padding: 4px 3px;
+  background: #e8efe9;
+  border-radius: 1px;
+  display: grid;
+  align-content: start;
+  gap: 3px;
+}
+
+.pda-page i {
+  height: 2px;
+  background: #56615b;
+}
+.pda-page i:nth-child(1) { width: 70%; }
+.pda-page i:nth-child(4) { width: 55%; }
+
+.pda-shot.flash .pda-page {
+  animation: pda-flash 0.5s ease-out;
+}
+
+@keyframes pda-flash {
+  from {
+    background: #fff;
+    box-shadow: 0 0 22px 8px rgba(255, 255, 255, 0.9);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pda-list li[data-state='urgent'] .pda-dot,
+  .pda-shot.flash .pda-page {
+    animation: none;
+  }
+}
+
+/* ---- a first-use hint, beside the control it's about ---- */
+.first-hint {
+  position: absolute;
+  z-index: 6;
+  max-width: min(230px, calc(100vw - 150px));
+  padding: 9px 12px;
+  border-radius: 8px;
+  background: #4ee08a;
+  color: #0c1a12;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.35;
+  pointer-events: auto;
+  transform: translateY(-50%);
+  animation: first-hint-in 0.2s ease-out;
+}
+
+.first-hint.hidden {
+  display: none;
+}
+
+.first-hint::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  margin-top: -5px;
+  background: inherit;
+  transform: rotate(45deg);
+}
+
+.first-hint[data-side='left']::after {
+  right: -4px;
+}
+
+.first-hint[data-side='right']::after {
+  left: -4px;
+}
+
+.first-hint[data-side='none'] {
+  left: 50%;
+  top: 42%;
+  transform: translate(-50%, -50%);
+}
+
+.first-hint[data-side='none']::after {
+  display: none;
+}
+
+@keyframes first-hint-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* What a long press does, over Fire and Sneak for the first few jobs. */
+.hold-cap {
+  display: none;
+  position: absolute;
+  right: max(20px, env(safe-area-inset-right));
+  width: 84px;
+  text-align: center;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #e7e1cf;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+  pointer-events: none;
+}
+
+body.hold-caps .touch-controls:not(.hidden-controls) .hold-cap {
+  display: block;
+}
+
+.hold-cap-fire {
+  bottom: calc(max(30px, env(safe-area-inset-bottom)) + 175px);
+}
+
+.hold-cap-sneak {
+  bottom: calc(max(30px, env(safe-area-inset-bottom)) + 104px);
+}
+
+body.modal-open .first-hint,
+body.modal-open .hold-cap {
+  display: none;
+}
+
+/* ---- lining up a trap: Roll / Set here / cancel ---- */
+.trap-aim {
+  position: absolute;
+  left: 50%;
+  bottom: calc(max(30px, env(safe-area-inset-bottom)) + 70px);
+  transform: translateX(-50%);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  pointer-events: auto;
+}
+
+.trap-aim.hidden,
+body.modal-open .trap-aim,
+body.touch-ui.trap-aiming .trap-panel {
+  display: none;
+}
+
+.trap-aim-hint {
+  flex-basis: 100%;
+  text-align: center;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #ffd79a;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+}
+
+.trap-aim-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 179, 71, 0.6);
+  background: rgba(14, 18, 23, 0.9);
+  color: #ffd79a;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+/* The dash moves you, not a trap: the cool colour of the camo and the pipes. */
+.trap-aim-dash {
+  border-color: rgba(111, 214, 240, 0.6);
+  color: #bfefff;
+}
+
+.trap-aim-roll {
+  background: #ffb347;
+  color: #2a1a04;
+  border-color: transparent;
+}
+
+.trap-aim-btn kbd {
+  font: inherit;
+  font-size: 10px;
+  opacity: 0.7;
+}
+
+/* On a touch screen the three sit in the right thumb's column, above the kit, and lose their key hints. */
+body.touch-ui .trap-aim {
+  left: auto;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: calc(max(30px, env(safe-area-inset-bottom)) + 256px);
+  transform: none;
+  flex-direction: column;
+  align-items: flex-end;
+  max-width: 180px;
+}
+
+body.touch-ui .trap-aim-hint {
+  text-align: right;
+}
+
+body.touch-ui .trap-aim-btn kbd {
+  display: none;
+}
+
+body.touch-ui .trap-aim-btn {
+  min-width: 112px;
+  justify-content: center;
+  padding: 12px 16px;
+}
+
+/* ---- terminal hack progress ---- */
+.hack-status {
+  position: absolute;
+  top: calc(env(safe-area-inset-top) + 46px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(300px, calc(100vw - 32px));
+  padding: 8px 12px 10px;
+  background: rgba(10, 13, 18, 0.82);
+  border: 1px solid rgba(78, 224, 138, 0.45);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.hack-status.hidden {
+  display: none;
+}
+
+.partner-pill {
+  position: absolute;
+  top: calc(env(safe-area-inset-top) + 100px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(300px, calc(100vw - 32px));
+  padding: 7px 12px 8px;
+  background: rgba(10, 13, 18, 0.82);
+  border: 1px solid rgba(111, 224, 255, 0.5);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  pointer-events: none;
+}
+
+.partner-pill.hidden,
+.partner-bar.hidden {
+  display: none;
+}
+
+.partner-pill.down {
+  border-color: rgba(255, 90, 70, 0.75);
+}
+
+.partner-text {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+  color: #cfeaf5;
+}
+
+.partner-pill.down .partner-text {
+  color: #ffb4a8;
+}
+
+.partner-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+
+.partner-fill {
+  height: 100%;
+  width: 0%;
+  background: #6fe0ff;
+}
+
+.coop-toggle[hidden] {
+  display: none;
+}
+
+.coop-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(111, 224, 255, 0.35);
+  border-radius: 10px;
+  background: rgba(10, 13, 18, 0.5);
+  cursor: pointer;
+}
+
+.coop-toggle input {
+  margin-top: 3px;
+  width: 18px;
+  height: 18px;
+  accent-color: #6fe0ff;
+  flex: none;
+}
+
+.coop-toggle-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.coop-toggle-title {
+  font-weight: 700;
+}
+
+.coop-toggle-note {
+  font-size: 12px;
+  opacity: 0.75;
+  line-height: 1.35;
+}
+
+.hack-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+  color: #bff5d3;
+}
+
+.hack-bar {
+  height: 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+
+.hack-fill {
+  height: 100%;
+  width: 0%;
+  background: #4ee08a;
+}
+
+/* Paused (player stepped away): dimmed, progress kept. */
+.hack-status.paused {
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.hack-status.paused .hack-label {
+  color: #9aa4ad;
+}
+
+.hack-status.paused .hack-fill {
+  background: #5d6b64;
+}
+
+/* ---- toasts ---- */
+.toast-stack {
+  position: absolute;
+  bottom: calc(120px + env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(calc(100vw - 32px), 640px); /* left: 50% would otherwise squeeze long toasts into half the screen */
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 6px;
+  align-items: center;
+  pointer-events: none;
+}
+
+.toast {
+  font-size: 12.5px;
+  letter-spacing: 0.02em;
+  padding: 7px 14px;
+  border-radius: 4px;
+  background: rgba(10, 13, 18, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  text-align: center;
+  text-wrap: balance; /* a long one (a new chapter's rules) wraps instead of running off the screen */
+  opacity: 0.95;
+}
+
+/* A notice can be tapped away on a touch screen (hud.ts clears them all), and on a small one they are smaller and sit under the top bar, out of the way of the stick and the buttons. */
+@media (pointer: coarse) {
+  .toast {
+    pointer-events: auto;
+  }
+}
+
+@media (max-width: 620px), (max-height: 480px) {
+  .toast-stack {
+    width: min(calc(100vw - 24px), 440px);
+    gap: 4px;
+  }
+
+  .toast {
+    font-size: 11px;
+    line-height: 1.3;
+    padding: 5px 10px;
+  }
+}
+
+/* Held sideways there is no room at the bottom (the stick and the buttons): the one notice shown at a time goes under the top bar, narrow and see-through, so little of
+   the view is lost. Held upright they sit above the gun bar, clear of the top. */
+@media (max-height: 480px) {
+  .toast-stack {
+    top: calc(env(safe-area-inset-top) + 46px);
+    bottom: auto;
+    flex-direction: column;
+    width: min(320px, 46vw);
+  }
+  .toast {
+    background: rgba(10, 13, 18, 0.62);
+    border-color: rgba(255, 255, 255, 0.1);
+    font-size: 10.5px;
+  }
+}
+
+@media (max-width: 620px) and (min-height: 481px) {
+  .toast-stack {
+    bottom: calc(300px + env(safe-area-inset-bottom));
+  }
+}
+
+/* Narrow screens: the twist and side-goal chips shrink, and the PDA steps down out from under them. */
+@media (max-width: 480px) {
+  .twist-chip,
+  .side-chip {
+    max-width: calc(100vw - 24px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 9.5px;
+    letter-spacing: 0.08em;
+  }
+
+  .twist-chip {
+    top: 48px;
+  }
+
+  .side-chip {
+    top: 70px;
+  }
+
+  .pda {
+    top: calc(env(safe-area-inset-top) + 98px);
+  }
+}
+
+.toast.good {
+  border-color: #7fc98a;
+  color: #b6e6bc;
+}
+
+.toast.bad {
+  border-color: #e06a7c;
+  color: #f2b6bf;
+}
+
+/* ---- spotted banner: a brief full-screen dramatic flash of text ---- */
+.danger-vignette {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, rgba(255, 40, 40, 0) 52%, rgba(200, 20, 20, 0.55) 100%);
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  z-index: 1;
+}
+
+.danger-vignette.pulse {
+  transition: none;
+}
+
+.spotted-banner {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 0 24px;
+  font-size: clamp(28px, 7vw, 52px);
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #ff5c5c;
+  text-shadow: 0 0 24px rgba(255, 60, 60, 0.85), 0 0 4px rgba(0, 0, 0, 0.9);
+  background: rgba(20, 4, 4, 0.28);
+  pointer-events: none;
+  animation: spotted-pulse 1.3s ease-out;
+}
+
+.spotted-banner.hidden {
+  display: none;
+}
+
+@keyframes spotted-pulse {
+  0% {
+    opacity: 0;
+    transform: scale(0.88);
+  }
+  15% {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+  25% {
+    transform: scale(1);
+  }
+  75% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* ---- touch controls: a fixed joystick, always in the same place
+   (bottom-left) so it's discoverable, + interact button (bottom-right) ---- */
+.touch-controls {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+}
+
+.touch-controls.hidden-controls .joystick-base,
+.touch-controls.hidden-controls .strafe-pad,
+.touch-controls.hidden-controls .fire-btn,
+.touch-controls.hidden-controls .kit,
+.touch-controls.hidden-controls .sneak-btn {
+  display: none;
+}
+
+/* interact-btn is NOT hidden by .hidden-controls (unlike the joystick/sneak
+   button, which are genuinely mobile-only) — it's a mouse-clickable
+   fallback shown on desktop too whenever something's nearby (via its own
+   .hidden class, toggled by setInteractEnabled), alongside the E/Space/
+   Enter keyboard shortcut. */
+
+.joystick-base {
+  position: absolute;
+  left: max(24px, env(safe-area-inset-left));
+  bottom: max(28px, env(safe-area-inset-bottom));
+  width: 116px;
+  height: 116px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.joystick-thumb {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(224, 189, 108, 0.85);
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+/* Sidestep/peek pair, centered over the joystick so the same (left) thumb
+   slides straight up onto it — the right-hand column is already full. */
+.strafe-pad {
+  position: absolute;
+  left: calc(max(24px, env(safe-area-inset-left)) + 58px);
+  bottom: calc(max(28px, env(safe-area-inset-bottom)) + 128px);
+  transform: translateX(-50%);
+  display: flex;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.strafe-btn {
+  width: 48px;
+  height: 40px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: #e7e1cf;
+  font-size: 14px;
+  line-height: 1;
+  pointer-events: auto;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.strafe-btn.held {
+  background: rgba(224, 189, 108, 0.85);
+  color: #1a1206;
+  border-color: transparent;
+}
+
+.interact-btn {
+  position: absolute;
+  right: max(20px, env(safe-area-inset-right));
+  bottom: max(30px, env(safe-area-inset-bottom));
+  min-width: 84px;
+  padding: 14px 18px;
+  border-radius: 40px;
+  background: rgba(224, 189, 108, 0.92);
+  color: #1a1206;
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  border: none;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.interact-btn.hidden {
+  display: none;
+}
+
+.sneak-btn {
+  position: absolute;
+  right: max(20px, env(safe-area-inset-right));
+  bottom: calc(max(30px, env(safe-area-inset-bottom)) + 66px);
+  min-width: 84px;
+  padding: 10px 18px;
+  border-radius: 40px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #e7e1cf;
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  pointer-events: auto;
+  touch-action: manipulation;
+}
+
+.sneak-btn.active {
+  background: rgba(224, 189, 108, 0.92);
+  color: #1a1206;
+  border-color: transparent;
+}
+
+/* Sneak doubles as camo (hold it): a thin battery bar along the bottom of
+   the button (--charge, set by controls-touch.ts), glowing cyan while the
+   cloak is on. .holding fills the button while a press is becoming a hold. */
+.sneak-btn {
+  --charge: 1;
+  overflow: hidden;
+  isolation: isolate; /* lets the hold fill sit between the background and the label */
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.sneak-btn::after {
+  content: '';
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 4px;
+  height: 3px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #7fd8c4 calc(var(--charge) * 100%), rgba(255, 255, 255, 0.12) calc(var(--charge) * 100%));
+}
+
+.sneak-btn.camo-low::after {
+  background: linear-gradient(90deg, #56626d calc(var(--charge) * 100%), rgba(255, 255, 255, 0.12) calc(var(--charge) * 100%));
+}
+
+.sneak-btn.camo-on {
+  border-color: #6fe0ff;
+  box-shadow: 0 0 12px rgba(111, 224, 255, 0.7);
+}
+
+.sneak-btn.camo-on::after {
+  background: linear-gradient(90deg, #6fe0ff calc(var(--charge) * 100%), rgba(111, 224, 255, 0.2) calc(var(--charge) * 100%));
+}
+
+.sneak-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(111, 224, 255, 0.35);
+  transform-origin: left;
+  transform: scaleX(0);
+  z-index: -1;
+}
+
+.sneak-btn.holding::before {
+  transform: scaleX(1);
+  transition: transform 450ms linear;
+}
+
+/* Fire is mobile-only (desktop uses a plain mouse click, no on-screen
+   prompt needed — "click to shoot" is an expected default). Stacked above
+   Sneak since it'll be the more frequently used action once bots exist. */
+.fire-btn {
+  position: absolute;
+  right: max(20px, env(safe-area-inset-right));
+  bottom: calc(max(30px, env(safe-area-inset-bottom)) + 132px);
+  min-width: 84px;
+  padding: 12px 18px;
+  border-radius: 40px;
+  background: rgba(179, 44, 44, 0.85);
+  color: #ffe8e8;
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  pointer-events: auto;
+  touch-action: manipulation;
+  transition: opacity 0.15s ease;
+}
+
+/* Ammo is unlimited, so this isn't a "used up" state — just a brief
+   recharge between shots. Dimmed and unpressable rather than hidden, so the
+   button stays in place and reads as "back in a moment," not "gone." */
+/* The gun has switched itself to the EMP (a stun-immune target in the
+   sights), or needs one and has none. .holding fills while a press is
+   becoming a forced EMP. */
+/* A takedown is on offer: the button turns bright and silent-looking. */
+.fire-btn.takedown {
+  background: rgba(240, 240, 235, 0.95);
+  color: #14171b;
+}
+
+.fire-btn.emp {
+  background: rgba(40, 150, 180, 0.9);
+  color: #e6fbff;
+}
+
+.fire-btn.no-emp {
+  background: rgba(90, 40, 44, 0.85);
+  color: #e0a8ae;
+}
+
+.fire-btn {
+  overflow: hidden;
+  isolation: isolate;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.fire-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: rgba(111, 224, 255, 0.5);
+  transform-origin: left;
+  transform: scaleX(0);
+}
+
+.fire-btn.holding::before {
+  transform: scaleX(1);
+  transition: transform 450ms linear;
+}
+
+.fire-btn.recharging {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+/* The kit, above Fire: tap the case and the tools fan out around it on an
+   arc (--a, set per tool in game.html), in reach of the right thumb. */
+.kit {
+  position: absolute;
+  right: max(20px, env(safe-area-inset-right));
+  bottom: calc(max(30px, env(safe-area-inset-bottom)) + 192px);
+  width: 54px;
+  height: 54px;
+  pointer-events: none;
+}
+
+.kit-btn {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: rgba(20, 34, 28, 0.92);
+  border: 1.5px solid rgba(78, 224, 138, 0.75);
+  color: #4ee08a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  touch-action: manipulation;
+  transition: transform 0.15s;
+}
+
+.kit.open .kit-btn {
+  background: #4ee08a;
+  color: #0c1a12;
+  transform: rotate(-12deg);
+}
+
+/* Until it's first opened, the case pulses so a new player finds it. */
+.kit.hint .kit-btn {
+  animation: kit-hint 1.6s ease-in-out infinite;
+}
+
+@keyframes kit-hint {
+  50% {
+    box-shadow: 0 0 0 7px rgba(78, 224, 138, 0.22);
+  }
+}
+
+/* The flash grenade: offered (pulsing) when a guard or a dog has the agent. A pill with its key on a desktop, a round button beside Fire on a phone. */
+.flash-prompt {
+  position: absolute;
+  z-index: 30;
+  right: 28px;
+  bottom: 96px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 18px;
+  border-radius: 30px;
+  background: rgba(240, 244, 250, 0.96);
+  border: 2px solid #fff;
+  color: #10141a;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  pointer-events: auto;
+  touch-action: manipulation;
+  animation: flash-prompt-pulse 0.7s ease-in-out infinite;
+}
+
+.flash-prompt.hidden,
+body.training .flash-prompt {
+  display: none;
+}
+
+/* Training has no flash grenades, except the gun's course, which teaches them (hud.ts's setFlashLesson). */
+body.training #kit-smoke,
+body.training #kit-shock,
+body.training:not(.flash-lesson) #kit-flash,
+body.training:not(.flash-lesson) .flash-btn {
+  display: none;
+}
+
+.flash-prompt-label {
+  color: #10141a;
+}
+
+.flash-prompt kbd {
+  padding: 1px 7px;
+  border-radius: 4px;
+  background: #10141a;
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+}
+
+.flash-prompt em {
+  font-style: normal;
+  font-size: 11px;
+  color: #10141a;
+}
+
+body.touch-ui .flash-prompt {
+  right: calc(max(20px, env(safe-area-inset-right)) + 108px);
+  bottom: calc(max(30px, env(safe-area-inset-bottom)) + 40px);
+  width: 70px;
+  height: 70px;
+  padding: 0;
+  border-radius: 50%;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0;
+}
+
+body.touch-ui .flash-prompt kbd {
+  display: none;
+}
+
+/* Bullet time: a pill beside the flash's (a desktop), a round button on a phone; while it lasts the pill is a draining bar. */
+.bullet-prompt {
+  right: 150px;
+  bottom: 96px;
+  padding: 11px 16px 15px;
+  background: rgba(120, 170, 255, 0.96);
+  position: absolute;
+}
+
+.bullet-prompt .bullet-bar {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 6px;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(16, 20, 26, 0.25);
+  overflow: hidden;
+}
+
+.bullet-prompt .bullet-bar i {
+  display: block;
+  height: 100%;
+  width: 100%;
+  background: #10141a;
+}
+
+.bullet-prompt.on {
+  animation: none;
+  background: rgba(16, 24, 48, 0.94);
+  border-color: #7fb0ff;
+  color: #cfe0ff;
+}
+
+.bullet-prompt.on .flash-prompt-label,
+.bullet-prompt.on kbd {
+  color: #cfe0ff;
+}
+
+.bullet-prompt.on kbd {
+  background: #1d2c52;
+}
+
+.bullet-prompt.on .bullet-bar i {
+  background: #7fb0ff;
+}
+
+body.touch-ui .bullet-prompt {
+  right: calc(max(20px, env(safe-area-inset-right)) + 326px);
+  bottom: calc(max(30px, env(safe-area-inset-bottom)) + 46px);
+  width: 58px;
+  height: 58px;
+  padding: 0;
+  font-size: 10px;
+}
+
+body.touch-ui .bullet-prompt .bullet-bar {
+  left: 12px;
+  right: 12px;
+  bottom: 9px;
+}
+
+/* The smoke and shock offers sit above the flash's (a desktop) or beside it (a phone), in their own colours. */
+.grenade-prompt {
+  bottom: 156px;
+  padding: 9px 16px;
+  font-size: 12px;
+}
+
+.grenade-prompt.smoke-prompt {
+  right: 28px;
+  background: rgba(190, 198, 206, 0.96);
+}
+
+.grenade-prompt.shock-prompt {
+  right: 176px;
+  background: rgba(150, 226, 255, 0.96);
+}
+
+body.touch-ui .grenade-prompt {
+  bottom: calc(max(30px, env(safe-area-inset-bottom)) + 46px);
+  width: 58px;
+  height: 58px;
+  padding: 0;
+  font-size: 11px;
+}
+
+body.touch-ui .grenade-prompt.smoke-prompt {
+  right: calc(max(20px, env(safe-area-inset-right)) + 190px);
+}
+
+body.touch-ui .grenade-prompt.shock-prompt {
+  right: calc(max(20px, env(safe-area-inset-right)) + 258px);
+}
+
+@keyframes flash-prompt-pulse {
+  50% {
+    box-shadow: 0 0 0 11px rgba(255, 255, 255, 0.28);
+  }
+}
+
+/* The white-out when a flash goes off (--flash: how much of it the agent caught); softer for anyone who has asked for less motion. */
+.flash-out {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: #fff;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.flash-out.go {
+  animation: flash-out 1.7s ease-out forwards;
+}
+
+@keyframes flash-out {
+  0% {
+    opacity: var(--flash, 0.9);
+  }
+  20% {
+    opacity: calc(var(--flash, 0.9) * 0.9);
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.flash-out.go.slow {
+  animation-name: flash-out-slow;
+  animation-duration: 2.8s;
+  animation-timing-function: ease-in;
+}
+
+/* A guard's flash: white for a moment, then the picture comes back slowly. */
+@keyframes flash-out-slow {
+  0% {
+    opacity: var(--flash, 0.9);
+  }
+  30% {
+    opacity: var(--flash, 0.9);
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flash-out.go,
+  .flash-out.go.slow {
+    animation-name: flash-out-soft;
+  }
+}
+
+@keyframes flash-out-soft {
+  0% {
+    opacity: 0.25;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Bullet time: the edges of the screen darken and cool while it lasts (the colour itself drains in the picture's own grade, postfx.ts). */
+body.slowmo::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, rgba(80, 130, 255, 0) 42%, rgba(8, 16, 56, 0.6) 100%);
+}
+
+.kit-tool {
+  --r: 0px;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 46px;
+  height: 46px;
+  margin: -23px 0 0 -23px;
+  border-radius: 50%;
+  background: rgba(14, 18, 23, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: #e7e1cf;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  opacity: 0;
+  pointer-events: none;
+  touch-action: manipulation;
+  transform: rotate(var(--a)) translateX(var(--r)) rotate(calc(var(--a) * -1)) scale(0.5);
+  transition:
+    transform 0.16s ease-out,
+    opacity 0.12s;
+}
+
+.kit.open .kit-tool {
+  --r: 150px; /* ten tools, 18 degrees apart: about a button's width between centres */
+  opacity: 1;
+  pointer-events: auto;
+  transform: rotate(var(--a)) translateX(var(--r)) rotate(calc(var(--a) * -1));
+}
+
+.kit-tool[aria-pressed='true'] {
+  border-color: #e0bd6c;
+  color: #e0bd6c;
+}
+
+.kit-tool .torch-cross {
+  display: none;
+}
+#kit-torch[aria-pressed='false'] .torch-cross {
+  display: inline;
+}
+
+.kit-flare {
+  border-color: rgba(255, 138, 61, 0.7);
+  color: #ffd9b8;
+}
+
+.kit-count {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 9px;
+  background: #e0bd6c;
+  color: #1a1206;
+  font-size: 10px;
+  font-style: normal;
+  line-height: 17px;
+}
+
+.kit-tool.empty {
+  opacity: 0.45;
+}
+
+.kit-charge {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 6px;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.15);
+  overflow: hidden;
+}
+
+.kit-charge i {
+  display: block;
+  height: 100%;
+  width: 100%;
+  background: #4ee08a;
+}
+
+/* On a touch screen the kit carries the trap, torch, goggles and map, so the top row keeps only help and sound. */
+body.touch-ui .trap-btn,
+body.touch-ui .flash-btn,
+body.touch-ui .torch-btn,
+body.touch-ui .goggles-btn,
+body.touch-ui .map-btn {
+  display: none;
+}
+
+@media (max-width: 480px) {
+  body.touch-ui .help-btn {
+    right: 38px;
+  }
+}
+
+/* Held sideways there is no height for the arc (its top tools went off the screen): the ten tools open as a grid to the left of the case instead, five across and
+   two down, centred on it, in the clear space between the stick and the buttons. They keep their DOM order: trap, flare, torch, night vision, map, grapple, flash, smoke, shock, gun. */
+@media (max-height: 480px) {
+  .kit-tool {
+    --tx: 0px;
+    --ty: 0px;
+    transform: translate(var(--tx), var(--ty)) scale(0.5);
+  }
+  .kit.open .kit-tool {
+    transform: translate(var(--tx), var(--ty));
+  }
+  .kit-tool:nth-child(1) {
+    --tx: -64px;
+    --ty: -27px;
+  }
+  .kit-tool:nth-child(2) {
+    --tx: -116px;
+    --ty: -27px;
+  }
+  .kit-tool:nth-child(3) {
+    --tx: -168px;
+    --ty: -27px;
+  }
+  .kit-tool:nth-child(4) {
+    --tx: -220px;
+    --ty: -27px;
+  }
+  .kit-tool:nth-child(5) {
+    --tx: -64px;
+    --ty: 27px;
+  }
+  .kit-tool:nth-child(6) {
+    --tx: -116px;
+    --ty: 27px;
+  }
+  .kit-tool:nth-child(7) {
+    --tx: -168px;
+    --ty: 27px;
+  }
+  .kit-tool:nth-child(8) {
+    --tx: -220px;
+    --ty: 27px;
+  }
+  .kit-tool:nth-child(9) {
+    --tx: -272px;
+    --ty: -27px;
+  }
+  .kit-tool:nth-child(10) {
+    --tx: -272px;
+    --ty: 27px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kit.hint .kit-btn {
+    animation: none;
+  }
+  .kit-tool {
+    transition: none;
+  }
+}
+
+/* ---- training coach: what to do at the current station ---- */
+.coach {
+  position: absolute;
+  top: calc(env(safe-area-inset-top) + 52px);
+  left: max(16px, env(safe-area-inset-left));
+  width: min(320px, calc(100vw - 32px));
+  padding: 10px 14px 12px;
+  background: rgba(10, 13, 18, 0.86);
+  border: 1px solid rgba(224, 189, 108, 0.45);
+  border-left: 3px solid #e0bd6c;
+  border-radius: 6px;
+  transition: border-color 0.25s;
+}
+
+.coach.hidden {
+  display: none;
+}
+
+.coach.done {
+  border-color: rgba(78, 224, 138, 0.7);
+}
+
+.coach-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.coach-kicker {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #e0bd6c;
+  font-variant-numeric: tabular-nums;
+}
+
+.coach.done .coach-kicker {
+  color: #4ee08a;
+}
+
+.coach-pips {
+  display: flex;
+  gap: 3px;
+}
+
+.coach-pips i {
+  width: 6px;
+  height: 6px;
+  border-radius: 1px;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.coach-pips i.past {
+  background: #4ee08a;
+}
+
+.coach-pips i.now {
+  background: #e0bd6c;
+}
+
+.coach-title {
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #f1ead8;
+  margin-bottom: 4px;
+}
+
+.coach-text {
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: #cbd3da;
+  text-wrap: pretty;
+}
+
+/* Click (or tap) to fold the lesson down to one line, and again to open it; it folds by itself a few seconds into each lesson. */
+@media all {
+  .coach {
+    pointer-events: auto;
+    cursor: pointer;
+  }
+  .coach-fold {
+    position: absolute;
+    right: 12px;
+    bottom: 8px;
+    width: 8px;
+    height: 8px;
+    border-right: 2px solid #e0bd6c;
+    border-bottom: 2px solid #e0bd6c;
+    transform: rotate(-135deg);
+  }
+  .coach.collapsed {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 7px 34px 7px 12px;
+  }
+  .coach.collapsed .coach-fold {
+    bottom: 12px;
+    transform: rotate(45deg);
+  }
+  .coach.collapsed .coach-head {
+    margin: 0;
+    flex: none;
+  }
+  .coach.collapsed .coach-pips,
+  .coach.collapsed .coach-text {
+    display: none;
+  }
+  .coach.collapsed .coach-title {
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+/* Held sideways there is little height: the coach stays at the left, narrower, and out of the stick's way. */
+@media (max-height: 480px) {
+  .coach {
+    width: min(300px, 44vw);
+    padding: 7px 12px 9px;
+  }
+  .coach-text {
+    font-size: 12px;
+    line-height: 1.35;
+  }
+}
+
+/* Upright phones: the coach spans the top, under the map and sound buttons (their own row there), and the hack bar drops below it. */
+@media (max-width: 600px) {
+  .coach {
+    top: calc(env(safe-area-inset-top) + 86px);
+    right: max(16px, env(safe-area-inset-right));
+    width: auto;
+    padding: 8px 12px 10px;
+  }
+  .coach-pips i {
+    width: 4px;
+  }
+  body.training .hack-status {
+    top: calc(env(safe-area-inset-top) + 212px);
+  }
+}
+
+body.map-open .coach,
+body.modal-open .coach {
+  visibility: hidden;
+}
+
+/* ---- remote trap camera: the feed is drawn on the canvas under .trap-feed ---- */
+.trap-panel {
+  position: absolute;
+  top: calc(env(safe-area-inset-top) + 56px);
+  right: max(16px, env(safe-area-inset-right));
+  width: 256px;
+  padding: 7px 8px 8px;
+  background: rgba(8, 12, 10, 0.88);
+  border: 1px solid rgba(78, 224, 138, 0.45);
+  border-radius: 6px;
+  pointer-events: auto;
+}
+
+.trap-panel.hidden {
+  display: none;
+}
+
+.trap-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.trap-title {
+  color: #4ee08a;
+  font-variant-numeric: tabular-nums;
+}
+
+.trap-status {
+  margin-left: auto;
+  color: #ffb347;
+}
+
+.trap-status.live {
+  color: #4ee08a;
+}
+
+.trap-next {
+  border: 1px solid rgba(78, 224, 138, 0.4);
+  border-radius: 3px;
+  background: transparent;
+  color: #4ee08a;
+  font-size: 10px;
+  padding: 1px 6px;
+  cursor: pointer;
+}
+
+.trap-next[hidden] {
+  display: none;
+}
+
+/* See-through: the canvas shows the camera here. A green night-vision wash and scanlines sit on top. */
+.trap-feed {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  border: 1px solid rgba(78, 224, 138, 0.35);
+  border-radius: 3px;
+  background:
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.22) 0 1px, transparent 1px 3px),
+    rgba(60, 255, 140, 0.1);
+  pointer-events: none;
+}
+
+.trap-blast {
+  display: block;
+  width: 100%;
+  margin-top: 7px;
+  padding: 7px 0;
+  border: 1px solid #ff6a4a;
+  border-radius: 4px;
+  background: rgba(255, 106, 74, 0.16);
+  color: #ffb3a1;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.trap-blast:disabled {
+  border-color: rgba(255, 255, 255, 0.15);
+  background: transparent;
+  color: #5b636c;
+  cursor: default;
+}
+
+.trap-blast kbd {
+  font: inherit;
+  font-size: 10px;
+  opacity: 0.7;
+  margin-left: 4px;
+}
+
+@media (pointer: coarse) {
+  .trap-blast kbd {
+    display: none;
+  }
+}
+
+/* Phones: mid-right, clear of the coach at the top and the buttons at the bottom. */
+@media (max-width: 600px) {
+  .trap-panel {
+    top: 30%;
+    width: 184px;
+  }
+}
+
+body.map-open .trap-panel,
+body.modal-open .trap-panel {
+  visibility: hidden;
+}
+
+
+/* ---- recon: the fly-over of the objectives and the way out (hud.ts's setTour) ---- */
+.tour {
+  position: fixed;
+  inset: 0;
+  pointer-events: auto;
+  cursor: pointer;
+  z-index: 30;
+}
+
+.tour.hidden {
+  display: none;
+}
+
+/* The rest of the HUD steps aside while it plays. */
+body.touring .overlay > :not(.tour),
+body.touring .touch-controls {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.tour-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: rgba(5, 6, 10, 0.94);
+  padding: 0 max(18px, env(safe-area-inset-left));
+  animation: tour-in 0.45s ease-out both;
+}
+
+.tour-bar-top {
+  top: 0;
+  height: calc(env(safe-area-inset-top) + 44px);
+  padding-top: env(safe-area-inset-top);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tour-bar-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  bottom: 0;
+  min-height: calc(env(safe-area-inset-bottom) + 92px);
+  padding-top: 12px;
+  padding-bottom: calc(env(safe-area-inset-bottom) + 12px);
+  animation-name: tour-in-bottom;
+}
+
+@keyframes tour-in {
+  from { transform: translateY(-100%); }
+}
+@keyframes tour-in-bottom {
+  from { transform: translateY(100%); }
+}
+
+.tour-kicker {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #6fcf97;
+}
+
+.tour-skip {
+  font: inherit;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #e7e1cf;
+  background: transparent;
+  border: 1px solid rgba(231, 225, 207, 0.35);
+  border-radius: 4px;
+  padding: 5px 12px;
+  cursor: pointer;
+}
+
+.tour-caption {
+  flex: 1;
+  min-width: 0;
+}
+
+.tour-next {
+  flex: none;
+  min-width: 96px;
+  min-height: 44px;
+  padding: 0 20px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #05060a;
+  background: var(--tour, #ffb04a);
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.tour-next::after {
+  content: ' ▸';
+}
+
+.tour-next:hover,
+.tour-next:focus-visible {
+  filter: brightness(1.12);
+  outline: none;
+}
+
+.tour-title {
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--tour, #ffb04a);
+}
+
+.tour-text {
+  margin-top: 4px;
+  max-width: 62ch;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: #d6d0bf;
+}
+
+.tour[data-kind='uplink'] { --tour: #6fd6f0; }
+.tour[data-kind='files'] { --tour: #ffb04a; }
+.tour[data-kind='logs'] { --tour: #b79cff; }
+.tour[data-kind='stairs'] { --tour: #e7e1cf; }
+.tour[data-kind='exit'] { --tour: #6fcf97; }
+
+/* A ring on the ground at the stop, with its name. */
+.tour-pin {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+}
+
+.tour-pin.hidden {
+  display: none;
+}
+
+.tour-pin i {
+  position: absolute;
+  left: -24px;
+  top: -24px;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 2px solid var(--tour, #ffb04a);
+  box-shadow: 0 0 14px var(--tour, #ffb04a);
+  animation: tour-ping 1.4s ease-out infinite;
+}
+
+.tour-pin b {
+  position: absolute;
+  left: 0;
+  bottom: 34px;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 3px;
+  background: rgba(5, 6, 10, 0.82);
+  border: 1px solid var(--tour, #ffb04a);
+  color: var(--tour, #ffb04a);
+}
+
+@keyframes tour-ping {
+  from { transform: scale(0.55); opacity: 1; }
+  to { transform: scale(1.25); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tour-bar { animation: none; }
+  .tour-pin i { animation: none; }
+}
+
+
+/* ---- the report's case: what the mission did to it, and what carries into the next one ---- */
+.report-fallout {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 12px 0;
+  margin-bottom: 2px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.report-fallout[hidden] {
+  display: none;
+}
+
+.report-section-title {
+  font: 600 10.5px/1 var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #9aa4ad;
+}
+
+.fallout-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+
+.fallout-list li {
+  position: relative;
+  padding-left: 16px;
+  color: #cbd3da;
+}
+
+.fallout-list li::before {
+  content: '•';
+  position: absolute;
+  left: 2px;
+  color: #9aa4ad;
+}
+
+.fallout-list li[data-tone='good']::before {
+  content: '▲';
+  font-size: 9px;
+  top: 2px;
+  color: #6fcf97;
+}
+
+.fallout-list li[data-tone='bad']::before {
+  content: '▼';
+  font-size: 9px;
+  top: 2px;
+  color: #e06a7c;
+}
+
+.case-meter {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 2px 0 6px;
+}
+
+.case-meter[hidden] {
+  display: none;
+}
+
+.case-bar {
+  position: relative;
+  height: 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  margin-bottom: 14px;
+}
+
+.case-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: 4px;
+  background: #e0bd6c;
+  transition: width 0.8s ease-out;
+}
+
+.case-tick {
+  position: absolute;
+  top: -3px;
+  width: 2px;
+  height: 14px;
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.case-tick.reached {
+  background: #6fcf97;
+}
+
+.case-tick b {
+  position: absolute;
+  top: 16px;
+  right: 0;
+  font: 600 9px/1 var(--mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #9aa4ad;
+  white-space: nowrap;
+}
+
+.case-tick.reached b {
+  color: #6fcf97;
+}
+
+.case-caption {
+  font-size: 12px;
+  color: #cbd3da;
+  line-height: 1.4;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .case-fill {
+    transition: none;
+  }
+}
+
+/* The daily brief's line about the week's case. */
+.brief-daily-case {
+  font: 600 11px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: 0.04em;
+  color: #e0bd6c;
+}
+
+.brief-daily-case[hidden] {
+  display: none;
+}
+
+
+/* A look that isn't drawn yet: the portraits dim and spin until its models are in (hud.ts's setAgentPortraitsLoading). */
+.portrait-spinner {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 30px;
+  height: 30px;
+  margin: -15px 0 0 -15px;
+  border-radius: 50%;
+  border: 3px solid rgba(224, 189, 108, 0.25);
+  border-top-color: #e0bd6c;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+  animation: portrait-spin 0.8s linear infinite;
+}
+
+.agent-pick.loading .portrait-spinner {
+  opacity: 1;
+}
+
+.agent-pick.loading .agent-portrait img {
+  opacity: 0.3;
+  filter: blur(1.5px);
+}
+
+.agent-portrait img {
+  transition: opacity 0.2s, filter 0.2s;
+}
+
+.look-status {
+  margin-left: 8px;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  color: #e0bd6c;
+}
+
+.look-status[hidden] {
+  display: none;
+}
+
+@keyframes portrait-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .portrait-spinner {
+    animation-duration: 2.4s;
+  }
+}
+
+
+/* Who's played here and how far they've got. */
+.report-community {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.report-community[hidden] {
+  display: none;
+}
+
+.community-line {
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: #cbd3da;
+}
+
+.report-community .report-board-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 3px 0;
+  color: #cbd3da;
+}
+
+.report-community .report-board-list li b {
+  font: 600 12px var(--mono, ui-monospace, monospace);
+  color: #e0bd6c;
+  font-weight: 600;
+}
+
+.report-community .report-board-list li.you span {
+  color: #6fcf97;
+}
+
+.brief-community {
+  margin: 0 0 12px;
+  font: 600 11px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: 0.04em;
+  color: #9aa4ad;
+  text-align: center;
+}
+
+.brief-community[hidden] {
+  display: none;
+}
+
+
+/* ---- a captured file, read with the job paused (game/hud.ts showReader) ---- */
+.reader {
+  position: fixed;
+  inset: 0;
+  pointer-events: auto; /* (the overlay it sits in takes no clicks) */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(4, 6, 10, 0.72);
+  opacity: 0;
+  transition: opacity 0.45s ease;
+  z-index: 60;
+}
+
+.reader.on {
+  opacity: 1;
+}
+
+.reader-paper {
+  width: min(560px, 100%);
+  max-height: 100%;
+  overflow: auto;
+  padding: 18px 22px 16px;
+  background: #12161b;
+  border: 1px solid #3a3322;
+  border-radius: 4px;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.6);
+  color: #cdd6dd;
+}
+
+.reader-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #3a3322;
+  font-family: ui-monospace, 'IBM Plex Mono', Menlo, Consolas, monospace;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #ffb86b;
+}
+
+.reader-paper h3 {
+  margin: 14px 0 8px;
+  font-family: ui-monospace, 'IBM Plex Mono', Menlo, Consolas, monospace;
+  font-size: 19px;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+  color: #ece6da;
+}
+
+.reader-body {
+  min-height: 7.5em;
+  margin: 0;
+  font-family: ui-monospace, 'IBM Plex Mono', Menlo, Consolas, monospace;
+  font-size: 13.5px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+
+.reader-note {
+  margin: 12px 0 0;
+  padding-left: 10px;
+  border-left: 2px solid #ffb86b;
+  font-family: 'Source Serif 4', Georgia, 'Times New Roman', serif;
+  font-style: italic;
+  font-size: 14.5px;
+  line-height: 1.5;
+  color: #ffb86b;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+
+.reader-note:empty {
+  display: none;
+}
+
+.reader-note.on {
+  opacity: 1;
+}
+
+.reader-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 14px;
+  font-family: ui-monospace, 'IBM Plex Mono', Menlo, Consolas, monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #8b97a1;
+}
+
+.reader-back {
+  padding: 8px 14px;
+  border: 1px solid #ffb86b;
+  border-radius: 4px;
+  background: #ffb86b;
+  color: #14110a;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.reader-back:focus-visible {
+  outline: 2px solid #ece6da;
+  outline-offset: 2px;
+}
+
+/* ---- a file page, found in a capture (game/hud.ts showMemory) ---- */
+.memory-card {
+  position: fixed;
+  left: max(16px, env(safe-area-inset-left));
+  bottom: 22%;
+  width: min(330px, 78vw);
+  padding: 12px 16px 14px;
+  background: rgba(10, 12, 18, 0.82);
+  border-left: 2px solid #ffb86b;
+  color: #ece6da;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.7s ease, transform 0.7s ease;
+  z-index: 25;
+}
+
+.memory-card.on {
+  opacity: 1;
+  transform: none;
+}
+
+.memory-kicker {
+  font-family: ui-monospace, 'IBM Plex Mono', Menlo, Consolas, monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #ffb86b;
+  margin-bottom: 6px;
+}
+
+.memory-card p {
+  margin: 0;
+  font-family: 'Source Serif 4', Georgia, 'Times New Roman', serif;
+  font-style: italic;
+  font-size: 15px;
+  line-height: 1.45;
+  text-wrap: pretty;
+}
+
+/* On a touch screen the thumbs are at the bottom corners: the card sits higher. */
+@media (pointer: coarse) {
+  .memory-card {
+    bottom: auto;
+    top: 30%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .memory-card {
+    transition: opacity 0.2s;
+    transform: none;
+  }
+}
+
+/* The brief's two links (the field manual, the file) side by side, with room between. */
+.brief-link + .brief-link {
+  margin-left: 20px;
+}
+
+
+/* The controls sheet's sliders and its reset (hud.ts's wireControlSettings). */
+.help-slider {
+  cursor: default;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.help-slider label {
+  flex: 1 1 160px;
+}
+
+.help-slider input[type='range'] {
+  flex: 2 1 140px;
+  width: auto;
+  height: 28px;
+  margin: 0;
+}
+
+.help-turn-value {
+  min-width: 3.2em;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: #ffc857;
+}
+
+.help-reset {
+  margin: -4px 0 14px;
+}
+
+/* Keyboard-only settings are hidden where the touch controls are showing. */
+body.touch-ui .desktop-only {
+  display: none;
+}
+
+
+/* The key list: one row per action, each with a button showing its key (hud.ts's showKeyList). */
+.help-keys {
+  margin: 0 0 16px;
+}
+
+.help-key-list {
+  display: grid;
+  gap: 4px;
+}
+
+.help-key-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  font-size: 13px;
+  color: #e7e1cf;
+}
+
+.help-key {
+  min-width: 96px;
+  padding: 5px 10px;
+  background: rgba(255, 200, 87, 0.08);
+  color: #ffc857;
+  border: 1px solid rgba(255, 200, 87, 0.45);
+  border-radius: 5px;
+  font: inherit;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.help-key:focus-visible {
+  outline: 2px solid #ffc857;
+  outline-offset: 2px;
+}
+
+.help-key.capturing {
+  background: #ffc857;
+  color: #0b0d12;
+}
+
+.help-key-hint {
+  margin: 8px 0 0;
+  font-size: 11px;
+  color: #9aa4ad;
+}
+
+
+/* How low the agent is: three pips (standing, crouched, flat), the current one lit, the next one outlined (hud.ts's setPosture). */
+.posture {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  margin-left: 10px;
+  padding: 3px 0 2px;
+}
+
+.posture-pip {
+  width: 8px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.16);
+  outline: 1px solid transparent;
+  transition: background 0.15s, outline-color 0.15s;
+}
+
+.posture-pip[data-p='stand'] {
+  height: 16px;
+}
+
+.posture-pip[data-p='crouch'] {
+  height: 11px;
+}
+
+.posture-pip[data-p='prone'] {
+  height: 5px;
+  width: 14px;
+}
+
+.posture-pip.on {
+  background: #ffc857;
+}
+
+.posture-pip.next:not(.on) {
+  outline-color: rgba(255, 200, 87, 0.7);
+}
+
+/* The Sneak button on a phone: a second glow when the agent is flat. */
+#sneak-btn.prone {
+  box-shadow: 0 0 0 3px rgba(255, 200, 87, 0.55), 0 0 14px rgba(255, 200, 87, 0.5);
+}
+
+
+/* The visibility meter: a thin bar under the top row, on the right, with a word for how exposed the agent is. */
+.visibility {
+  position: fixed;
+  top: 52px;
+  right: max(12px, env(safe-area-inset-right));
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 190px;
+  padding: 4px 8px;
+  background: rgba(8, 10, 15, 0.6);
+  border-radius: 4px;
+  font-family: ui-monospace, 'IBM Plex Mono', Menlo, Consolas, monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: #c4ccd6;
+  pointer-events: none;
+  z-index: 12;
+}
+
+.visibility[hidden] {
+  display: none;
+}
+
+.ir-readout {
+  position: fixed;
+  top: 80px;
+  right: max(12px, env(safe-area-inset-right));
+  padding: 4px 8px;
+  background: rgba(2, 18, 12, 0.7);
+  border: 1px solid rgba(76, 255, 138, 0.45);
+  border-radius: 4px;
+  font-family: ui-monospace, 'IBM Plex Mono', Menlo, Consolas, monospace;
+  font-size: 10px;
+  line-height: 1.5;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #4cff8a;
+  pointer-events: none;
+}
+
+.ir-readout[hidden] {
+  display: none;
+}
+
+.visibility-bar {
+  flex: 1;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.visibility-fill {
+  height: 100%;
+  width: 4%;
+  border-radius: 3px;
+  background: #5fd3a2;
+  transition: background 0.2s;
+}
+
+.visibility-word {
+  min-width: 6.5em;
+  text-align: right;
+  color: #5fd3a2;
+}
+
+.visibility[data-band='high'] .visibility-fill {
+  background: #ffc857;
+}
+
+.visibility[data-band='high'] .visibility-word {
+  color: #ffc857;
+}
+
+.visibility[data-band='seen'] .visibility-fill {
+  background: #ff5a5f;
+}
+
+.visibility[data-band='seen'] .visibility-word {
+  color: #ff5a5f;
+}
+
+.visibility[data-band='hidden'] .visibility-fill {
+  background: #7fb8ff;
+}
+
+.visibility[data-band='hidden'] .visibility-word {
+  color: #7fb8ff;
+}
+
+@media (max-width: 520px) {
+  .visibility {
+    width: 150px;
+  }
+  .visibility-caption {
+    display: none;
+  }
+}
+
+
+/* The dash's energy: a thin bar after the posture pips, only while the dash is in use or refilling (hud.ts's setDash). */
+.dash-bar {
+  align-self: center;
+  width: 34px;
+  height: 4px;
+  margin-left: 6px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.14);
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.dash-bar.show {
+  opacity: 1;
+}
+
+.dash-fill {
+  display: block;
+  height: 100%;
+  background: #7fb8ff;
+}
+
+.dash-bar.active .dash-fill {
+  background: #ffc857;
+}
+
+/* The gun's recharge, made obvious: the pill says RECHARGING or READY, dims while it fills, flashes once when it's charged, and shakes when the trigger is pulled too soon. */
+.weapon-status .weapon-state { font-size: 10px; font-weight: 800; letter-spacing: 0.08em; color: #e0bd6c; min-width: 70px; }
+.weapon-status.charging { border-color: rgba(111, 224, 255, 0.55); }
+.weapon-status.charging .weapon-state { color: #6fe0ff; }
+.weapon-status.charging .weapon-label { color: #5f6a73; }
+.weapon-status .weapon-bar { width: 72px; }
+.weapon-status.flash-ready { animation: weapon-ready 0.55s ease-out; }
+.weapon-status.flash-denied { animation: weapon-denied 0.3s linear; }
+@keyframes weapon-ready { 0% { box-shadow: 0 0 0 0 rgba(224, 189, 108, 0.9); background: rgba(70, 58, 20, 0.9); } 100% { box-shadow: 0 0 0 16px rgba(224, 189, 108, 0); } }
+@keyframes weapon-denied { 0%, 100% { transform: translateX(-50%); } 20% { transform: translateX(calc(-50% - 5px)); border-color: #ff5a4a; } 60% { transform: translateX(calc(-50% + 5px)); border-color: #ff5a4a; } }
+@media (max-width: 480px) { @keyframes weapon-denied { 0%, 100% { transform: none; } 20% { transform: translateX(-5px); border-color: #ff5a4a; } 60% { transform: translateX(5px); border-color: #ff5a4a; } } }
+@media (prefers-reduced-motion: reduce) { .weapon-status.flash-ready, .weapon-status.flash-denied { animation: none; } }
+
+/* The job's twist (twists.ts), under the top bar: its name, and a clock when it has one. */
+.twist-chip {
+  position: fixed;
+  top: 52px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 3px 10px;
+  border: 1px solid rgba(224, 189, 108, 0.55);
+  border-radius: 999px;
+  background: rgba(10, 14, 20, 0.7);
+  color: #e0bd6c;
+  font: 700 11px/1.3 ui-monospace, Menlo, monospace;
+  letter-spacing: 0.14em;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 12;
+}
+.twist-chip.hidden {
+  display: none;
+}
+.twist-chip[data-urgent='true'] {
+  border-color: rgba(255, 90, 80, 0.8);
+  color: #ff7a6e;
+}
+
+/* The job's side goal (sidegoals.ts), under the twist's chip. */
+.side-chip {
+  position: fixed;
+  top: 78px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 3px 10px;
+  border: 1px solid rgba(111, 245, 230, 0.5);
+  border-radius: 999px;
+  background: rgba(10, 14, 20, 0.7);
+  color: #6ff5e6;
+  font: 700 11px/1.3 ui-monospace, Menlo, monospace;
+  letter-spacing: 0.14em;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 12;
+}
+.side-chip.hidden {
+  display: none;
+}
+.side-chip[data-lost='true'] {
+  border-color: rgba(138, 151, 166, 0.45);
+  color: #8a97a6;
+  text-decoration: line-through;
+}
+
+/* ---- the "turn your phone sideways" card (orientation.ts): a touch screen held upright; the cross puts it away ---- */
+.rotate-hint {
+  position: fixed;
+  left: 50%;
+  top: 38%;
+  transform: translateX(-50%);
+  z-index: 9;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: min(calc(100vw - 32px), 360px);
+  padding: 10px 8px 10px 14px;
+  background: rgba(10, 13, 18, 0.92);
+  border: 1.5px solid #e0bd6c;
+  border-radius: 6px;
+  color: #e9e3d2;
+  font-size: 13px;
+  line-height: 1.35;
+  pointer-events: auto;
+}
+
+.rotate-hint[hidden] {
+  display: none;
+}
+
+.rotate-hint-text {
+  flex: 1;
+}
+
+.rotate-hint-phone {
+  flex: none;
+  width: 14px;
+  height: 24px;
+  border: 2px solid #e0bd6c;
+  border-radius: 3px;
+  animation: rotate-hint-turn 2.4s ease-in-out infinite;
+}
+
+@keyframes rotate-hint-turn {
+  0%,
+  25% {
+    transform: rotate(0deg);
+  }
+  60%,
+  100% {
+    transform: rotate(-90deg);
+  }
+}
+
+.rotate-hint-lock {
+  flex: none;
+  padding: 6px 12px;
+  border: 1.5px solid #e0bd6c;
+  border-radius: 999px;
+  background: transparent;
+  color: #e0bd6c;
+  font: 700 11px/1 ui-monospace, Menlo, monospace;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.rotate-hint-lock[hidden] {
+  display: none;
+}
+
+.rotate-hint-close {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  font-size: 20px;
+  line-height: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rotate-hint-phone {
+    animation: none;
+    transform: rotate(-90deg);
+  }
+}
+
+/* ---- A phone held sideways (short screens): every control stays on the screen, and little of the view is covered ----
+   The stick, the sidestep pad and the Fire, Sneak and kit buttons already sit at the two sides. What used to float in the middle, or stack up past the top, moves:
+   the Fire/Camo/EMP status shrinks to a slim strip at the bottom centre, the trap-aiming buttons line up in a row above it, the flash prompt above those, and the
+   trap camera drops to a small window at the top centre, out of the way of the buttons. */
+@media (max-height: 480px) {
+  .weapon-status {
+    bottom: max(6px, env(safe-area-inset-bottom));
+    gap: 6px;
+    padding: 2px 9px;
+    background: rgba(10, 13, 18, 0.55);
+    border-color: rgba(255, 255, 255, 0.1);
+  }
+  .weapon-status .weapon-label {
+    display: none; /* the bar's colour and the word beside it say it: the labels were most of its width */
+  }
+  .weapon-status .weapon-bar {
+    width: 44px;
+  }
+  .weapon-status .weapon-state {
+    min-width: 0;
+    font-size: 9.5px;
+  }
+
+  body.touch-ui .trap-aim {
+    left: 50%;
+    right: auto;
+    bottom: calc(max(6px, env(safe-area-inset-bottom)) + 34px);
+    transform: translateX(-50%);
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 6px;
+    max-width: calc(100vw - 300px);
+  }
+  body.touch-ui .trap-aim-hint {
+    flex-basis: 100%;
+    text-align: center;
+    font-size: 10px;
+  }
+  body.touch-ui .trap-aim-btn {
+    min-width: 0;
+    padding: 9px 12px;
+  }
+
+  .flash-prompt {
+    right: auto;
+    left: 50%;
+    bottom: calc(max(6px, env(safe-area-inset-bottom)) + 40px);
+    transform: translateX(-50%);
+  }
+
+  /* The trap camera: a small window at the left, under the PDA and above the sidestep pad. The feed sits at its left, and the arming status, Next and Detonate at its right. */
+  .trap-panel {
+    top: auto;
+    right: auto;
+    left: max(16px, env(safe-area-inset-left));
+    bottom: calc(max(28px, env(safe-area-inset-bottom)) + 128px + 40px + 6px);
+    transform: none;
+    width: 216px;
+    padding: 5px 6px;
+    display: grid;
+    grid-template-columns: 104px 1fr;
+    grid-template-areas:
+      'feed head'
+      'feed blast';
+    column-gap: 6px;
+    row-gap: 4px;
+    align-items: stretch;
+  }
+  .trap-panel .trap-head {
+    grid-area: head;
+    flex-wrap: wrap;
+    gap: 2px 6px;
+    margin: 0;
+    align-content: flex-start;
+  }
+  .trap-panel .trap-feed {
+    grid-area: feed;
+    width: 104px;
+  }
+  .trap-panel .trap-blast {
+    grid-area: blast;
+    margin: 0;
+    align-self: end;
+    padding: 7px 6px;
+  }
+
+  /* The twist and the side goal move to the left, under the PDA (the top centre is the view), and step to the right of it while the trap camera is up, which takes the
+     place under the PDA. */
+  .twist-chip,
+  .side-chip {
+    left: max(16px, env(safe-area-inset-left));
+    transform: none;
+    max-width: 200px;
+    padding: 2px 8px;
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .twist-chip {
+    top: calc(env(safe-area-inset-top) + 92px);
+  }
+  .side-chip {
+    top: calc(env(safe-area-inset-top) + 114px);
+  }
+  body:has(.trap-panel:not(.hidden)) .twist-chip {
+    left: 150px;
+    top: calc(env(safe-area-inset-top) + 52px);
+  }
+  body:has(.trap-panel:not(.hidden)) .side-chip {
+    left: 150px;
+    top: calc(env(safe-area-inset-top) + 72px);
+  }
+}
+
+/* ---- messages: on a small screen the notices live behind a bell in the top bar (hud.ts, toasts.ts's inbox) ---- */
+.notif-btn {
+  display: none;
+  position: relative;
+}
+
+.notif-btn.ping svg {
+  animation: bell-ring 0.7s ease-out;
+}
+
+@keyframes bell-ring {
+  15% {
+    transform: rotate(18deg);
+  }
+  35% {
+    transform: rotate(-16deg);
+  }
+  55% {
+    transform: rotate(10deg);
+  }
+  75% {
+    transform: rotate(-6deg);
+  }
+}
+
+.notif-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: #e0bd6c;
+  color: #1a1206;
+  font: 800 10px/16px ui-monospace, Menlo, monospace;
+  text-align: center;
+}
+
+.notif-badge[hidden] {
+  display: none;
+}
+
+.notif-panel {
+  position: absolute;
+  z-index: 20;
+  top: calc(env(safe-area-inset-top) + 50px);
+  right: max(16px, env(safe-area-inset-right));
+  width: min(360px, calc(100vw - 32px));
+  max-height: calc(100% - 66px);
+  display: flex;
+  flex-direction: column;
+  background: rgba(10, 13, 18, 0.96);
+  border: 1.5px solid #e0bd6c;
+  border-radius: 6px;
+  pointer-events: auto;
+}
+
+.notif-panel.hidden {
+  display: none;
+}
+
+.notif-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px 7px 12px;
+  border-bottom: 1px solid rgba(224, 189, 108, 0.35);
+}
+
+.notif-title {
+  flex: 1;
+  font: 700 11px/1 ui-monospace, Menlo, monospace;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #e0bd6c;
+}
+
+.notif-paused {
+  font: 700 9px/1 ui-monospace, Menlo, monospace;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #9aa4ad;
+}
+
+.notif-close {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #e9e3d2;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.notif-body {
+  overflow-y: auto;
+  padding: 4px 12px 10px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.notif-section {
+  margin: 10px 0 5px;
+  font: 700 9.5px/1 ui-monospace, Menlo, monospace;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #9aa4ad;
+}
+
+.notif-pin {
+  margin-bottom: 7px;
+}
+
+.notif-pin-title {
+  font: 700 11px/1.3 ui-monospace, Menlo, monospace;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #e0bd6c;
+}
+
+.notif-pin-brief {
+  font-size: 12px;
+  line-height: 1.4;
+  color: #cbd3da;
+}
+
+.notif-empty {
+  font-size: 12px;
+  color: #9aa4ad;
+}
+
+.notif-item {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  font-size: 12px;
+  line-height: 1.35;
+  color: #e9e3d2;
+}
+
+.notif-item.bad .notif-text {
+  color: #f2b6bf;
+}
+
+.notif-item.good .notif-text {
+  color: #b6e6bc;
+}
+
+.notif-text {
+  flex: 1;
+  text-wrap: pretty;
+}
+
+.notif-age {
+  flex: none;
+  font: 600 10px/1 ui-monospace, Menlo, monospace;
+  color: #7f8b95;
+  white-space: nowrap;
+}
+
+/* Small screens: the bell is there, the twist and side-goal chips are not (they are pinned in the messages; only a twist running out of time still shows), the top bar's text is
+   smaller, and nothing floats over the view but a warning for a moment. */
+@media (max-width: 620px), (max-height: 480px) {
+  .notif-btn {
+    display: grid;
+  }
+  .twist-chip:not([data-urgent='true']),
+  .side-chip {
+    display: none;
+  }
+  .hud-top {
+    font-size: 10.5px;
+    gap: 10px;
+  }
+  .suspicion-caption {
+    font-size: 8.5px;
+  }
+}
+
+body.notif-open .toast-stack {
+  display: none;
+}
+
+/* The job is paused behind the messages: the touch buttons step aside rather than sit over them. */
+body.notif-open .touch-controls {
+  visibility: hidden;
+}
+
+/* The crosshair: four ticks round a gap, and a dot. Over the view, never over a tap. */
+.crosshair {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  width: 54px;
+  height: 54px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 6;
+  --ch: rgba(240, 240, 235, 0.92);
+}
+.crosshair.hidden {
+  display: none;
+}
+.crosshair.locked {
+  --ch: #ff5a4d;
+}
+.crosshair i {
+  position: absolute;
+  background: var(--ch);
+  box-shadow: 0 0 3px rgba(0, 0, 0, 0.7);
+}
+.crosshair i:nth-child(1) { left: 50%; top: 0; width: 2px; height: 16px; margin-left: -1px; }
+.crosshair i:nth-child(2) { left: 50%; bottom: 0; width: 2px; height: 16px; margin-left: -1px; }
+.crosshair i:nth-child(3) { top: 50%; left: 0; height: 2px; width: 16px; margin-top: -1px; }
+.crosshair i:nth-child(4) { top: 50%; right: 0; height: 2px; width: 16px; margin-top: -1px; }
+.crosshair b {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 4px;
+  height: 4px;
+  margin: -2px 0 0 -2px;
+  border-radius: 50%;
+  background: var(--ch);
+}
+.crosshair.locked { transform: translate(-50%, -50%) scale(0.86); transition: transform 0.12s ease; }
+/* On a head (aimassist.ts): gold, with a ring round the dot. Beside the crosshair, a word when there is one (HEAD, or ARMOUR · AIM HIGHER on a heavy's body). */
+.crosshair.head {
+  --ch: #ffd23f;
+}
+.crosshair.head b {
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  background: transparent;
+  border: 2px solid var(--ch);
+  box-shadow: 0 0 6px var(--ch);
+}
+.crosshair::after {
+  content: attr(data-note);
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  margin: -7px 0 0 8px;
+  white-space: nowrap;
+  font: 700 11px/1 ui-monospace, Menlo, Consolas, monospace;
+  letter-spacing: 0.08em;
+  color: var(--ch);
+  text-shadow: 0 0 3px #000, 0 0 3px #000;
+}
+
+.duck-btn {
+  position: absolute;
+  right: calc(max(20px, env(safe-area-inset-right)) + 100px);
+  bottom: calc(max(30px, env(safe-area-inset-bottom)) + 132px);
+  min-height: 44px;
+  padding: 12px 18px;
+  border: 1px solid #ffffff55;
+  border-radius: 40px;
+  background: #253847;
+  color: white;
+  font-weight: bold;
+  pointer-events: auto;
+  touch-action: manipulation;
+}
+.duck-btn[hidden],
+.hidden-controls .duck-btn {
+  display: none;
+}
+
+/* ---- the Training menu: every course, from the brief's Training button ---- */
+.training-intro {
+  margin: 0 0 12px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #b9c1c9;
+  text-align: center;
+}
+
+.training-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.training-row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  padding: 11px 14px;
+  background: rgba(224, 189, 108, 0.06);
+  border: 1px solid rgba(224, 189, 108, 0.35);
+  border-radius: 6px;
+  color: #e7e1cf;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
+.training-row:hover,
+.training-row:focus-visible {
+  background: rgba(224, 189, 108, 0.14);
+  border-color: #e0bd6c;
+  outline: none;
+}
+
+.training-row-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.training-row-title {
+  font-weight: 700;
+  font-size: 14px;
+  color: #e0bd6c;
+}
+
+.training-row-tag {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #7fd6a0;
+}
+
+.training-row-blurb {
+  font-size: 12px;
+  line-height: 1.4;
+  color: #aeb7bf;
+}
+
+.training-row.done .training-row-title {
+  color: #cdbf93;
+}
+
+/* The gun chip beside the fire pill, and the gun menu. */
+.gun-chip {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  border: 1px solid rgba(111, 224, 255, 0.45);
+  background: rgba(10, 18, 24, 0.85);
+  color: #cfeaf5;
+  font: 700 10px/1.4 ui-monospace, Menlo, monospace;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.gun-chip kbd {
+  font: 700 9px/1 ui-monospace, Menlo, monospace;
+  padding: 2px 4px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.14);
+  color: #e7e1cf;
+}
+@media (pointer: coarse) {
+  .gun-chip kbd {
+    display: none;
+  }
+}
+.gun-menu {
+  pointer-events: auto; /* the HUD layer it sits in lets clicks through */
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(4, 7, 10, 0.72);
+}
+.gun-menu.hidden {
+  display: none;
+}
+.gun-menu-card {
+  width: min(720px, 100%);
+  max-height: 100%;
+  overflow: auto;
+  padding: 14px 16px 12px;
+  background: rgba(12, 16, 22, 0.97);
+  border: 1px solid rgba(224, 189, 108, 0.45);
+  border-radius: 10px;
+  color: #e7e1cf;
+}
+.gun-menu-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.gun-menu-head h2 {
+  margin: 0;
+  font: 800 13px/1.2 ui-monospace, Menlo, monospace;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #e0bd6c;
+}
+.gun-menu-close {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: transparent;
+  color: inherit;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+.gun-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 8px;
+}
+.gun-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  text-align: left;
+  padding: 8px 10px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(22, 28, 36, 0.95);
+  color: inherit;
+  cursor: pointer;
+  min-height: 150px;
+  touch-action: manipulation;
+}
+.gun-card .gun-pic {
+  width: 100%;
+  height: 78px;
+  object-fit: contain;
+  margin-bottom: 4px;
+  pointer-events: none;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+}
+.gun-card:hover,
+.gun-card:focus-visible {
+  border-color: rgba(111, 224, 255, 0.7);
+  outline: none;
+}
+.gun-card.current {
+  border-color: #e0bd6c;
+  background: rgba(54, 44, 18, 0.9);
+}
+.gun-card .gun-num {
+  position: absolute;
+  left: 9px;
+  top: 9px;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.12);
+  font: 700 11px/18px ui-monospace, Menlo, monospace;
+  text-align: center;
+}
+.gun-card b {
+  display: block;
+  font: 800 12px/1.3 ui-monospace, Menlo, monospace;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.gun-card small {
+  display: block;
+  margin: 1px 0 4px;
+  color: #6fe0ff;
+  font: 700 10px/1.3 ui-monospace, Menlo, monospace;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.gun-card span {
+  font-size: 12px;
+  line-height: 1.35;
+  color: #b9b4a4;
+}
+.gun-note {
+  margin: 10px 0 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: #8a8f96;
+}
+
+/* The watchdog warning (dogwarn.ts): a marker per dog near or on your trail, and a red pulse round the edges when one is close. */
+.dog-warns {
+  position: fixed;
+  inset: 0;
+  z-index: 57;
+  pointer-events: none;
+}
+.dog-vignette {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  background: radial-gradient(ellipse at center, rgba(255, 40, 40, 0) 46%, rgba(255, 30, 30, 0.5) 100%);
+  animation: dog-vignette var(--beat, 1s) ease-in-out infinite;
+}
+@keyframes dog-vignette {
+  0%,
+  100% {
+    filter: brightness(0.7);
+  }
+  50% {
+    filter: brightness(1.5);
+  }
+}
+.dog-marker {
+  --c: #ffb02e;
+  position: absolute;
+  width: 58px;
+  height: 58px;
+  margin: -29px 0 0 -29px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  color: var(--c);
+  animation: dog-marker var(--beat, 1s) ease-in-out infinite;
+}
+.dog-marker.show {
+  display: flex;
+}
+.dog-marker.track {
+  --c: #ff3b30;
+}
+.dog-marker.partner-marker {
+  --c: #5fe3a8;
+  z-index: 3;
+}
+.dog-marker b {
+  font: 800 26px/1 ui-monospace, Menlo, Consolas, monospace;
+  text-shadow: 0 0 10px var(--c), 0 0 3px #000, 0 0 3px #000;
+}
+.dog-marker u {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  text-decoration: none;
+  font: 700 11px/1 ui-monospace, Menlo, Consolas, monospace;
+  letter-spacing: 0.08em;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(8, 10, 14, 0.78);
+  color: var(--c);
+}
+.dog-marker i {
+  position: absolute;
+  inset: 0;
+  transform: rotate(var(--rot, 0deg));
+}
+.dog-marker i::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  margin: -12px 0 0 22px;
+  border-left: 18px solid var(--c);
+  border-top: 12px solid transparent;
+  border-bottom: 12px solid transparent;
+  filter: drop-shadow(0 0 6px var(--c));
+}
+.dog-marker.on i::before {
+  display: none;
+}
+.dog-marker.on::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border: 3px solid var(--c);
+  border-radius: 50%;
+  box-shadow: 0 0 12px var(--c), inset 0 0 8px var(--c);
+}
+@keyframes dog-marker {
+  0%,
+  100% {
+    transform: scale(0.88);
+    opacity: 0.7;
+  }
+  50% {
+    transform: scale(1.14);
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dog-marker,
+  .dog-vignette {
+    animation: none;
+  }
+}
+
+/* ---- the mission briefing over the blueprint (hud.ts's openMap) ---- */
+.map-card.briefing .map-close,
+.map-card.briefing .map-music {
+  display: none;
+}
+.map-card.briefing .map-paused {
+  font-size: 0;
+}
+.map-card.briefing .map-paused::after {
+  content: 'Mission briefing';
+  font-size: 11px;
+}
+/* the sheet is drawn in the room left of the panel, so the panel never sits on the plan */
+.map-card.briefing .map-canvas {
+  width: calc(100% - min(340px, 36vw) - 36px);
+}
+.map-briefing {
+  position: absolute;
+  top: 64px;
+  right: 18px;
+  width: min(340px, 36vw);
+  max-height: calc(100% - 150px);
+  overflow-y: auto;
+  padding: 16px 18px;
+  border: 1px solid rgba(224, 189, 108, 0.45);
+  border-radius: 4px;
+  background: rgba(8, 24, 44, 0.92);
+  color: #dcecff;
+  z-index: 2;
+}
+.map-briefing.hidden {
+  display: none;
+}
+.mb-kicker {
+  font: 600 11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #e0bd6c;
+}
+.mb-title {
+  margin-top: 6px;
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.mb-sub {
+  margin-top: 2px;
+  font: 400 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: #a9cdf0;
+}
+.mb-label {
+  margin-top: 14px;
+  font: 600 11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #a9cdf0;
+}
+.mb-tasks {
+  margin: 6px 0 14px;
+  padding-left: 20px;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+.mb-tasks li + li {
+  margin-top: 8px;
+}
+@media (max-width: 760px) {
+  .map-card.briefing .map-canvas {
+    width: 100%;
+    flex: none;
+    height: 44%;
+  }
+  .map-briefing {
+    top: auto;
+    bottom: 12px;
+    left: 12px;
+    right: 12px;
+    width: auto;
+    max-height: 46%;
+  }
+}
+
+/* The boss's bar: under the health bar, a name, a track, and a line on what the shield is doing. */
+#boss-bar {
+  position: fixed;
+  top: 52px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(520px, 70vw);
+  z-index: 40;
+  pointer-events: none;
+  display: grid;
+  gap: 4px;
+  text-align: center;
+  font-family: var(--mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+#boss-bar[hidden] {
+  display: none;
+}
+#boss-bar .boss-name {
+  font-size: 12px;
+  color: #e8f3fa;
+}
+#boss-bar .boss-track {
+  height: 8px;
+  border: 1px solid rgba(190, 225, 245, 0.6);
+  background: rgba(8, 14, 20, 0.7);
+}
+#boss-bar .boss-fill {
+  display: block;
+  height: 100%;
+  background: #5fd4ff;
+  transition: width 0.25s ease-out;
+}
+#boss-bar .boss-note {
+  font-size: 11px;
+  color: #9fc4d6;
+}
+#boss-bar[data-state='up'] .boss-note {
+  color: #ffb04a;
+}
+#boss-bar[data-state='held'] .boss-note {
+  color: #4ee08a;
+}

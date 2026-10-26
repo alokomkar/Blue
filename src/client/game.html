@@ -1,0 +1,1122 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <link rel="stylesheet" type="text/css" href="game.css" />
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, width=device-width, height=device-height, user-scalable=0, viewport-fit=cover"
+    />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="full-screen" content="yes" />
+    <meta name="x5-fullscreen" content="true" />
+    <meta name="360-fullscreen" content="true" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  </head>
+  <body>
+    <canvas id="bg"></canvas>
+
+    <div class="overlay">
+      <!-- Top HUD: job number, score, documents (the job's actual win
+           condition — see fragments.ts/hud.ts's setDocuments()), suspicion
+           meter -->
+      <div class="hud-top" id="hud-top">
+        <span class="job-label" id="job-label">JOB 1</span>
+        <span class="score-label" id="score-label">SCORE 0</span>
+        <span class="documents-label" id="documents-label">FILES 0/0</span>
+        <span class="twist-chip hidden" id="twist-chip"></span>
+        <span class="side-chip hidden" id="side-chip"></span>
+        <div class="suspicion-wrap">
+          <span class="suspicion-caption">SUSPICION</span>
+          <div class="suspicion-bar"><div class="suspicion-fill" id="suspicion-fill"></div></div>
+          <!-- The rung the building is on (alertstate.ts, hud.ts's setAlertPhase): hidden while it is quiet. -->
+          <span class="alert-chip hidden" id="alert-chip" data-phase="quiet" role="status"></span>
+        </div>
+        <!-- How low the agent is: standing, crouched or flat, and where the next press of the sneak key takes them (hud.ts's setPosture). -->
+        <div class="posture" id="posture" role="img" aria-label="Standing">
+          <span class="posture-pip" data-p="stand"></span><span class="posture-pip" data-p="crouch"></span><span class="posture-pip" data-p="prone"></span>
+          <!-- The dash's energy (dash.ts, hud.ts's setDash): up only while it's in use or refilling. -->
+          <span class="dash-bar" id="dash-bar" aria-hidden="true"><span class="dash-fill" id="dash-fill"></span></span>
+        </div>
+        <button class="hud-icon-btn map-btn" id="map-btn" type="button" aria-label="Open blueprint">
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+            <path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z M9 4v14 M15 6v14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
+          </svg>
+        </button>
+        <button class="hud-icon-btn trap-btn" id="trap-btn" type="button" aria-label="Trap: aim a roll (G)">
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+            <ellipse cx="12" cy="16" rx="8" ry="3.2" fill="none" stroke="currentColor" stroke-width="1.6" />
+            <path d="M12 12.8V7M9.5 5.5h5v2.5h-5z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
+          </svg>
+          <span class="trap-count" id="trap-count">2</span>
+        </button>
+        <button class="hud-icon-btn flash-btn" id="flash-btn" type="button" aria-label="Flash grenade (1)">
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="1.6" /><path d="M12 2.5v4M12 17.5v4M2.5 12h4M17.5 12h4M5.3 5.3l2.8 2.8M15.9 15.9l2.8 2.8M18.7 5.3l-2.8 2.8M8.1 15.9l-2.8 2.8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg>
+          <span class="trap-count" id="flash-count">2</span>
+        </button>
+        <button class="hud-icon-btn torch-btn" id="torch-btn" type="button" aria-label="Torch (T)" aria-pressed="true">
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+            <path d="M8 3h8l-1.5 6h-5z M9.5 9h5v11.5a1 1 0 0 1-1 1h-3a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
+            <path class="torch-rays" d="M12 1.5v-1M5.5 3.5l-1-1M18.5 3.5l1-1" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+            <path class="torch-cross" d="M4 20L20 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+          </svg>
+        </button>
+        <button class="hud-icon-btn goggles-btn" id="goggles-btn" type="button" aria-label="Put night vision on (R)" aria-pressed="false">
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+            <path d="M6.5 10l1.5-3.5h8l1.5 3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
+            <path d="M2.5 10.5h19v5a2 2 0 0 1-2 2h-4l-2-2.5h-3l-2 2.5h-4a2 2 0 0 1-2-2z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
+            <circle cx="7.5" cy="13.5" r="1.7" fill="currentColor" />
+            <circle cx="16.5" cy="13.5" r="1.7" fill="currentColor" />
+          </svg>
+          <span class="goggles-charge"><span class="goggles-fill ready" id="goggles-fill"></span></span>
+        </button>
+        <!-- Messages (touch screens and small windows): the notices are kept here instead of floating over the view (hud.ts, toasts.ts's inbox). Opening it pauses the job. -->
+        <button class="hud-icon-btn notif-btn" id="notif-btn" type="button" aria-label="Messages" aria-expanded="false">
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+            <path d="M6 17V11a6 6 0 0 1 12 0v6l1.6 2H4.4z M10 21a2 2 0 0 0 4 0" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round" />
+          </svg>
+          <span class="notif-badge" id="notif-badge" hidden>0</span>
+        </button>
+        <button class="hud-icon-btn help-btn" id="help-btn" type="button" aria-label="Show controls (H)">
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+            <path d="M9.2 9.2a2.9 2.9 0 1 1 4.1 2.6c-.8.4-1.3 1.1-1.3 2v.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+            <circle cx="12" cy="17.6" r="1.1" fill="currentColor" />
+          </svg>
+        </button>
+        <button class="hud-icon-btn mute-btn" id="mute-btn" type="button" aria-label="Mute sound" aria-pressed="false">
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+            <path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor" />
+            <path class="mute-waves" d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+            <path class="mute-cross" d="M16 9l5 6M21 9l-5 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Looking out through a staff locker's vent slats while hiding — see hud.ts's setLockerView(). -->
+      <div class="locker-view" id="locker-view"></div>
+
+      <!-- Black screen for the lift ride between jobs — see hud.ts's setFade(). -->
+      <div class="fade-screen" id="fade-screen"></div>
+
+      <!-- Mission briefing: shown once, before Job 1 starts. See hud.ts's
+           showMissionBrief(). -->
+      <div class="brief-card" id="brief-card">
+        <div class="brief-title">BLUEPRINT JOB</div>
+        <!-- A new agent's welcome (until training is done): the story first, one clear next step. -->
+        <div class="brief-welcome" id="brief-welcome" hidden>
+          <div class="brief-welcome-kicker">Encrypted message · For a new agent</div>
+          <p class="brief-welcome-greeting">Good evening.</p>
+          <p>
+            We need someone who can get into a building at night, get hold of what the job calls for, whether that's
+            files, a ledger or a live sample, and get out without anyone knowing.
+          </p>
+          <p>
+            Your first night is a training floor, one move at a time. After that, there's a new building every night.
+          </p>
+          <p class="brief-welcome-sign">Control</p>
+        </div>
+        <!-- Today's Daily Heist — shown once the server answers (hud.ts's showMissionBrief). -->
+        <p class="brief-community" id="brief-community" hidden></p>
+        <div class="brief-daily" id="brief-daily" hidden>
+          <div class="brief-daily-head">
+            <span class="brief-daily-name" id="brief-daily-name">Daily Heist #1</span>
+            <span class="brief-daily-job" id="brief-daily-job">Job 8</span>
+          </div>
+          <p class="brief-daily-op" id="brief-daily-op"></p>
+          <p class="brief-daily-line">The same building for everyone today, one scored attempt, and a leaderboard for this community. The campaign carries on as usual.</p>
+          <p class="brief-daily-status" id="brief-daily-status"></p>
+          <p class="brief-daily-case" id="brief-daily-case" hidden></p>
+          <p class="brief-daily-streak" id="brief-daily-streak" hidden></p>
+          <p class="brief-daily-note" id="brief-daily-note" hidden></p>
+          <button class="btn btn-secondary" id="brief-daily-btn" type="button">Play today's heist</button>
+        </div>
+        <div class="brief-section">
+          <div class="brief-heading" id="agent-heading">Your agent</div>
+          <div class="agent-pick" role="radiogroup" aria-labelledby="agent-heading">
+            <button class="agent-card" type="button" role="radio" aria-checked="true" data-agent="male">
+              <span class="agent-portrait"><img alt="" /><i class="portrait-spinner" aria-hidden="true"></i></span>
+              <span class="agent-name">Agent A</span>
+              <span class="agent-role">Male agent</span>
+            </button>
+            <button class="agent-card" type="button" role="radio" aria-checked="false" data-agent="female">
+              <span class="agent-portrait"><img alt="" /><i class="portrait-spinner" aria-hidden="true"></i></span>
+              <span class="agent-name">Agent B</span>
+              <span class="agent-role">Female agent</span>
+            </button>
+          </div>
+          <div class="look-heading" id="look-heading">Look <span class="look-status" id="look-status" role="status" hidden>Loading the new look…</span></div>
+          <!-- Their own clothes, or the operative's bodysuit, and for the operative its colour and the hair (hud.ts fills these from skins.ts). -->
+          <div class="look-pick" id="look-pick" role="radiogroup" aria-labelledby="look-heading"></div>
+          <div class="style-pick" id="style-pick" hidden>
+            <div class="look-heading" id="suit-heading">Suit</div>
+            <div class="look-pick" id="suit-pick" role="radiogroup" aria-labelledby="suit-heading"></div>
+            <div class="look-heading" id="hair-heading">Hair</div>
+            <div class="look-pick" id="hair-pick" role="radiogroup" aria-labelledby="hair-heading"></div>
+          </div>
+          <!-- AI co-op: the agent's other half comes along on story jobs (hud.ts wires it; game.ts keeps the choice). -->
+          <label class="coop-toggle" for="coop-toggle">
+            <input type="checkbox" id="coop-toggle" />
+            <span class="coop-toggle-text">
+              <span class="coop-toggle-title">Play with an AI partner</span>
+              <span class="coop-toggle-note" id="coop-toggle-note"></span>
+            </span>
+          </label>
+        </div>
+        <div class="brief-section">
+          <div class="brief-heading">The job in a minute</div>
+          <ul class="brief-essentials">
+            <li>
+              Take the uplink (or alarm link) down, then do the job your PDA lists: photograph files, plant charges, lift a keycard,
+              carry out a specimen. It depends where you are. Then reach the way out.
+            </li>
+            <li>Guards, dogs and drones raise suspicion when they spot you. At 100% the job is over.</li>
+            <li>Sneak, take guards down from behind, hide in the dark. Loud is a last resort.</li>
+            <li>New threats arrive as jobs get harder, each explained when it first appears.</li>
+          </ul>
+          <button class="brief-link" id="brief-manual" type="button">Field manual &amp; controls</button>
+          <button class="brief-link" id="brief-file" type="button" hidden></button>
+        </div>
+        <div class="brief-actions">
+          <button class="btn btn-primary" id="brief-continue" type="button" hidden>Continue · Job 2</button>
+          <button class="btn btn-primary" id="brief-train" type="button">Start training (recommended)</button>
+          <button class="brief-link" id="brief-training-link" type="button">All training lessons</button>
+          <button class="btn btn-secondary" id="brief-begin" type="button">Skip to Job 1</button>
+        </div>
+      </div>
+
+      <!-- Every training course, from the brief's Training button (hud.ts's showMissionBrief). -->
+      <div class="brief-card training-card hidden" id="training-card" role="dialog" aria-modal="true" aria-label="Training">
+        <div class="brief-title">Training</div>
+        <p class="training-intro">Short courses with nothing at stake, one skill each. In this order, or straight to the one you want.</p>
+        <div class="training-list" id="training-list"></div>
+        <div class="brief-actions">
+          <button class="btn btn-secondary" id="training-back" type="button">Back</button>
+        </div>
+      </div>
+
+      <!-- The blueprint: a drawn floor plan of what's been explored or mapped.
+           See blueprint.ts (drawing) and hud.ts's openMap(). -->
+      <!-- The controls, any time during a job (H or the ? button) — the brief's own table, filtered to this device. -->
+      <div class="map-card help-card hidden" id="help-card" role="dialog" aria-modal="true" aria-label="Controls and field manual">
+        <div class="map-head">
+          <div class="map-tabs help-tabs" role="tablist">
+            <button class="map-tab" id="help-tab-controls" type="button" role="tab" aria-selected="true">Controls</button>
+            <button class="map-tab" id="help-tab-manual" type="button" role="tab" aria-selected="false">Field manual</button>
+          </div>
+          <span class="map-paused" id="help-paused">Paused</span>
+          <!-- Pulls out of the job (a second tap confirms): a failed run, like being caught. -->
+          <button class="help-abandon" id="help-abandon" type="button">Abandon job</button>
+          <button class="map-close" id="help-close" type="button" aria-label="Close">
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg>
+          </button>
+        </div>
+        <div class="help-body" id="help-controls" role="tabpanel">
+          <!-- Settings: the guide arrow (hud.ts's wireGuideSetting). -->
+          <label class="help-setting">
+            <input type="checkbox" id="help-guide" checked />
+            <span>Guide arrow: points the way to your next objective<small>Also the Guide button on the PDA, or P</small></span>
+          </label>
+          <!-- Setting: bullet time starts by itself when something closes in (hud.ts's wireBulletAutoSetting). -->
+          <label class="help-setting">
+            <input type="checkbox" id="help-bullet-auto" checked />
+            <span>Automatic bullet time: slows time when an enemy closes in<small>Untick to start it yourself with Space (or the button)</small></span>
+          </label>
+          <!-- Settings: black ink edges round every shape (postfx.ts's EdgePass; hud.ts's wireEdgesSetting). -->
+          <label class="help-setting">
+            <input type="checkbox" id="help-edges" />
+            <span>Black edges: an ink line round every shape and crease<small>A graphic, comic look; works best on lit surfaces</small></span>
+          </label>
+          <label class="help-setting" id="help-landscape-row" hidden>
+            <input type="checkbox" id="help-landscape" />
+            <span>Landscape view<small>Phones: turns the game sideways in the page (it restarts the page), then hold the phone sideways. Untick to go back</small></span>
+          </label>
+          <!-- Settings: how fast the agent turns, and whether turning from the keys eases in (hud.ts's wireControlSettings). -->
+          <div class="help-setting help-slider">
+            <label for="help-turn">Turn sensitivity<small>How fast the agent turns, from the keys and the stick</small></label>
+            <input type="range" id="help-turn" min="0.5" max="2" step="0.05" value="0.65" />
+            <span class="help-turn-value" id="help-turn-value">0.65×</span>
+          </div>
+          <div class="help-setting help-slider">
+            <label for="help-aim">Aim sensitivity<small>Both aiming axes, mouse or joystick. Lower is slower; walking stays the same</small></label>
+            <input type="range" id="help-aim" min="0.25" max="2" step="0.05" value="1" />
+            <span class="help-turn-value" id="help-aim-value">1.0×</span>
+          </div>
+          <div class="help-setting help-slider">
+            <label for="help-camera">Camera angle<small>Lower sees further ahead of you, higher looks down on the maze. Adjust it here while the game is paused</small></label>
+            <input type="range" id="help-camera" min="28" max="72" step="1" value="47" />
+            <span class="help-turn-value" id="help-camera-value">47°</span>
+          </div>
+          <label class="help-setting desktop-only">
+            <input type="checkbox" id="help-smooth" />
+            <span>Smooth turning<small>A and D ease up to full speed instead of snapping to it</small></span>
+          </label>
+          <label class="help-setting">
+            <input type="checkbox" id="help-dash" checked />
+            <span>Double-tap to dash<small>Tap forward twice and hold the second tap, or touch the stick twice and hold. Fast and loud, and it tires in a second or two</small></span>
+          </label>
+ <label class="help-setting desktop-only">
+            <input type="checkbox" id="help-fps" />
+            <span>First-person mode<small>The aim view stays up and you walk in it: W and S walk, Q and E sidestep, A and D and the mouse or trackpad turn, a click fires, Shift changes your pose</small></span>
+          </label>
+          <button class="brief-link help-reset" id="help-reset" type="button" hidden>Reset controls to the defaults</button>
+          <!-- The keys, one per action (hud.ts's showKeyList): click one, then press the key that should do it. -->
+          <div class="help-keys desktop-only" id="help-keys-wrap">
+            <div class="brief-heading">Keys</div>
+            <div class="help-key-list" id="help-keys"></div>
+            <p class="help-key-hint">Click a key, then press the one you want. Escape cancels. A key that’s already in use swaps places with it.</p>
+          </div>
+          <table class="brief-controls">
+                      <tbody>
+                        <tr>
+                          <td>Move</td>
+                          <td>{forward} {turnLeft} {back} {turnRight} / Arrow Keys</td>
+                          <td>Left joystick</td>
+                        </tr>
+                        <tr>
+                          <td>Crouch · lie flat (a quick second press)</td>
+                          <td>{sneak}, then {sneak} again</td>
+                          <td>Sneak button, tap again</td>
+                        </tr>
+                        <tr>
+                          <td>Dash (tap twice, hold the second)</td>
+                          <td>{forward}, then {forward} again and hold</td>
+                          <td>Touch the stick twice, hold the second</td>
+                        </tr>
+                        <tr>
+                          <td>Sidestep / Peek</td>
+                          <td>{strafeLeft} / {strafeRight}</td>
+                          <td>Hold &#9664; / &#9654;</td>
+                        </tr>
+                        <tr>
+                          <td>Dodge</td>
+                          <td>Double-tap {strafeLeft} / {strafeRight}</td>
+                          <td>Double-tap &#9664; / &#9654;</td>
+                        </tr>
+                        <tr>
+                          <td>Aim (anywhere)</td>
+                          <td>{aim} / Right Click</td>
+                          <td>Aim button</td>
+                        </tr>
+                        <tr>
+                          <td>Takedown / fire (auto)</td>
+                          <td>{fire} / Left Click</td>
+                          <td>Fire button</td>
+                        </tr>
+                        <tr>
+                          <td>Force an EMP</td>
+                          <td>{forceEmp}</td>
+                          <td>Press and hold Fire</td>
+                        </tr>
+                        <tr>
+                          <td>Flare</td>
+                          <td>{flare}</td>
+                          <td>Kit (case button) → Flare</td>
+                        </tr>
+                        <tr>
+                          <td>Flash grenade: blinds the guards and dogs on you for about 10 seconds</td>
+                          <td>{flash}</td>
+                          <td>Kit (case button) → Flash, or the Flash button when a guard has you</td>
+                        </tr>
+                        <tr>
+                          <td>Choose a gun: the stun pistol or a heavy gun, from a menu (its own shot and sound)</td>
+                          <td>{gun}</td>
+                          <td>Kit (case button) → Gun</td>
+                        </tr>
+                        <tr>
+                          <td>Guide arrow to the next objective, on or off</td>
+                          <td>{guide}</td>
+                          <td>PDA (top left) → Guide</td>
+                        </tr>
+                        <tr>
+                          <td>Grapple up to the pipes (every job)</td>
+                          <td>{grapple}</td>
+                          <td>Kit → Grapple</td>
+                        </tr>
+                        <tr>
+                          <td>Trap: aim, then roll · set here</td>
+                          <td>{trap}, then {trap} · {trapHere}</td>
+                          <td>Kit → Trap, then Roll · Set here</td>
+                        </tr>
+                        <tr>
+                          <td>Blow the trap · next camera</td>
+                          <td>{detonate} · {nextTrap}</td>
+                          <td>Detonate · ▶ on the feed</td>
+                        </tr>
+                        <tr>
+                          <td>Torch on / off</td>
+                          <td>{torch}</td>
+                          <td>Kit → Torch</td>
+                        </tr>
+                        <tr>
+                          <td>Night vision on / off</td>
+                          <td>{goggles}</td>
+                          <td>Kit → Night</td>
+                        </tr>
+                        <tr>
+                          <td>Camo (toggle)</td>
+                          <td>{camo}</td>
+                          <td>Press and hold Sneak</td>
+                        </tr>
+                        <tr>
+                          <td>These controls</td>
+                          <td>{controls}</td>
+                          <td>? button (top)</td>
+                        </tr>
+                        <tr>
+                          <td>The brief, again</td>
+                          <td>{letter}</td>
+                          <td>Brief on the PDA</td>
+                        </tr>
+                        <tr>
+                          <td>Recon: the objectives and the way out</td>
+                          <td>{recon}</td>
+                          <td>Recon on the PDA</td>
+                        </tr>
+                        <tr>
+                          <td>Blueprint map</td>
+                          <td>{map}</td>
+                          <td>Kit → Map</td>
+                        </tr>
+                        <tr>
+                          <td>Music on / off</td>
+                          <td>{music}</td>
+                          <td>♪ on the map</td>
+                        </tr>
+                        <tr>
+                          <td>Sound on / off</td>
+                          <td>{mute}</td>
+                          <td>Speaker button</td>
+                        </tr>
+                        <tr>
+                          <td>Interact · drag / drop body</td>
+                          <td>{interact} / Enter</td>
+                          <td>Interact button</td>
+                        </tr>
+                      </tbody>
+                    </table>
+        </div>
+        <div class="help-body help-manual" id="help-manual" role="tabpanel" hidden>
+          <div class="brief-section">
+            <div class="brief-heading">Objective</div>
+            <p>
+              Finish the job your PDA lists and the way out opens. Each place has its own kind of job (see Contracts
+              below), and its own way in and out. Suspicion maxing out ends the job.
+            </p>
+          </div>
+          <div class="brief-section">
+            <div class="brief-heading">The Uplink, and Records Jobs</div>
+            <p>
+              Nothing leaves on paper. First find the network closet (UPL on the blueprint; ALM on a job that isn't records) and take the uplink down:
+              while it's online, every station is locked and nothing can be done. On a records job, stand at each
+              records-room workstation to photograph its files. Every capture is written to the log server (LOG),
+              and the logs go out in the next batch. Your PDA counts down to it. Wipe them at the log console before
+              it hits zero. If the timer runs out, or you leave with logs still queued, you're burned: the alarm
+              sounds, hunters come, and it costs your grade, but the job goes on: get the files and reach the way out. (To give up instead, pause and abandon the job.) Wipe the logs, then bring the uplink back up, and nobody
+              will know it was down (+150).
+            </p>
+          </div>
+          <div class="brief-section">
+            <div class="brief-heading">Ways In</div>
+            <p>
+              Pick your way in on the brief. The main way in is on the ground floor, beside the uplink (a freight
+              lift, a service door, a loading bay, an airlock: it depends where you are): the usual way, and the
+              guards' rounds pass it. From job 2, the rooftop: a hatch on the quiet far
+              side of the upper floor, where you can cut the uplink's line at the junction box yourself, though the exit
+              is all the way downstairs and a cut line can't be brought back for a clean exit. From job 3, the service
+              tunnel: a grate deep in the ground floor, nearer the exit, but pitch dark, with a watchdog prowling nearby.
+            </p>
+          </div>
+          <div class="brief-section">
+            <div class="brief-heading">Contracts</div>
+            <p>
+              What the job asks depends on where it is. The campus is records: photograph the files. The museum is a
+              swap: take a keycard off the marked guard (a diamond shows through walls), then swap the exhibit in the
+              great hall. The refinery is sabotage: plant three charges, then run for the way out before the fuse
+              runs down. The bank is a vault: the keycard, the vault console, then the ledger. The warehouse is a
+              shipment: read the manifest at the dispatch console, then tag the container it names (a wrong one trips
+              an alarm). The lab is an extraction: take the specimen from its cryo pod and carry it out. It slows you,
+              rules out the grapple, the dash and dragging bodies, and spoils if you dawdle. In every one the uplink
+              comes down first, the HUD counts the steps, and the guide arrow points at the next.
+            </p>
+          </div>
+          <div class="brief-section">
+            <div class="brief-heading">Laser Gates</div>
+            <p>
+              Some beams ignore your cloak: they measure you, not what the cameras see. A gate of high red beams: crouch
+              and walk under it. A low magenta beam: get flat on the floor and crawl beneath it. A pulsing amber curtain:
+              wait for it to blink off (it flickers just before it comes back) and cross in the gap. The older fixed
+              grids that seal a corridor are the ones a cloak still beats. Catching a gate costs suspicion and the guards
+              come to look.
+            </p>
+          </div>
+          <div class="brief-section">
+            <div class="brief-heading">Twists &amp; Side Goals</div>
+            <p>
+              From the fourth job one thing is different each time: a shift change (the patrols take new routes), a
+              lockdown (the room doors seal for twenty seconds), lights out (more of the building dark), reinforcements,
+              a light kit (no traps or flash grenades), a clock (the alarm goes up when the window closes), or a silent night (no guards, only dogs that hunt by ear; you can't walk or run, only crouch or crawl, and every step carries: the ring on the floor shows how far. Stand perfectly still and a dog passing by only sniffs). The Daily
+              Heist deals two, never an unfair pair. A chip under the top bar names them. From the third job there is
+              also an optional side goal, such as no alarms, never spotted, no body found, under par, no stun shots or
+              no kit: clear the job with it intact for +250 heist points. The chip greys out the moment it is lost.
+            </p>
+          </div>
+          <div class="brief-section">
+            <div class="brief-heading">Records Rooms</div>
+            <p>
+              On records jobs a sentry stands in the doorway of each records room and of the log room. Throw a flare down a nearby
+              corridor and the sentry walks off to look at it — slip in behind it, or wait by the flare and stun it.
+              The HUD's FILES counter shows how many are still out there.
+            </p>
+          </div>
+          <div class="brief-section">
+            <div class="brief-heading">Lockers</div>
+            <p>
+              Records rooms also hold a few lockers, and they're a gamble: most hold loot (+15 score, suspicion eases),
+              but a rigged one costs you 10 score and lights a 5-second fuse on the locker. When it runs out the alarm
+              sounds, suspicion spikes, and two guards appear at the locker, so get clear.
+            </p>
+          </div>
+          <div class="brief-section">
+            <div class="brief-heading">Patrol Bots</div>
+            <p>
+              Bigger jobs mean more of them patrolling at once. Each sees in a cone ahead of it — the red wedge on the
+              floor — and notices anyone who gets right up close, from any side. Walls block both, so corners and
+              their backs are real cover, and they pause to look around between patrols. Stay in view too long and it
+              reports you, spiking suspicion. If one closes the distance, it opens fire — getting hit spikes suspicion
+              hard, so don't let it catch up.
+            </p>
+          </div>
+          <div class="brief-section">
+            <div class="brief-heading">Heavy Enforcers</div>
+            <p>
+              From job 9, big armoured bots guard the server rooms. They're slow and see a narrower cone, but their
+              shots hit harder. Three armour plates glow over their heads: each stun knocks one off and staggers
+              them for a moment, the only time a takedown works on one. An EMP drops them outright.
+            </p>
+          </div>
+          <div class="brief-section">
+            <div class="brief-heading">Crawler Mines</div>
+            <p>
+              From job 5, small spider-bots lie dormant in corridors, red eye barely glowing. Come within a few steps (fewer while
+              sneaking; not at all cloaked and still) and one wakes, scuttles after you, and goes off if it reaches you:
+              a big jump in suspicion that always trips the alarm. One stun or an EMP stops it. Outrun it and it gives up.
+            </p>
+          </div>
+          <div class="brief-section">
+            <div class="brief-heading">Drones</div>
+            <p>
+              From job 7, drones fly over the walls, sweeping a searchlight across the floor. Stand in the pool of light
+              for a moment and one spots you: it turns red, hangs over you, and calls the bots nearby in. Furniture
+              doesn't hide you from above; a crate, a staff locker, or standing cloaked, crouched and still does. Only
+              an EMP brings one down.
+            </p>
+          </div>
+          <div class="brief-section">
+            <div class="brief-heading">The Alarm</div>
+            <p>
+              Let suspicion reach 70% and the building goes into alarm: red lights, a klaxon, and every bot moves faster.
+              The first two alarms each send a pair of hunters (dark, fast, sharp-eyed) out of the exit, or up the
+              stairs if you're on floor 2, heading for where you were. It clears once suspicion drops back under 45%:
+              loot lockers bring it down.
+            </p>
+          </div>
+          <div class="brief-section">
+            <div class="brief-heading">Lights, Blackouts &amp; Night Vision</div>
+            <p>
+              From job 4, parts of each floor have lost power: the lights are dead and it's pitch dark. Guards see much less
+              far in there, unless your torch is on, and they can see its beam on the floor. Night-vision goggles show the
+              dark in green without a torch. They run on a battery that recharges while they're off, and putting them on
+              switches your torch off. Blackouts are hatched on the blueprint once you've been through them.
+            </p>
+            <p>
+              Every corridor light and lit room has a wall switch. Switching a light off is silent, unlike shooting it
+              out, but a guard nearby will notice and come to switch it back on, so darkness doubles as a lure. From
+              job 10, each floor's lights are wired in circuits with a breaker panel each: cut one and its whole
+              section goes dark, until a guard is sent to reset it.
+            </p>
+          </div>
+          <div class="brief-section">
+            <div class="brief-heading">Watchdogs</div>
+            <p>
+              From job 3, four-legged security robots that hunt by ear, not by sight. Walking is heard a couple of corridors away,
+              sneaking only up close, standing still not at all, and camo doesn't fool them. When one hears you it
+              barks and runs to where the sound came from, so sneak away from that spot. If it reaches you, the job
+              is over. The ring around your feet shows how far your noise carries while one is listening. A flare lures
+              them from further off than a bot.
+              From job 8 they hunt in packs: every half minute or so the pack regroups at a meeting point and sniffs
+              around there for a few seconds, and a dog that hears you calls the pack-mates near it. See them gathered
+              and the meeting point goes on your blueprint. A trap set there takes the whole pack at once.
+            </p>
+          </div>
+          <div class="brief-section">
+            <div class="brief-heading">Security Doors</div>
+            <p>
+              Some sections are sealed behind a security door, with files inside. Each door has a letter and a
+              colour. Find the terminal with the same colour and hack it (Interact once, then stay close for a few
+              seconds; stepping away pauses it), then find the matching server room and switch its power grid on.
+              The door opens, the section is mapped, and a beacon marks its records room. From job 5 the doors come in a
+              chain: the terminal and server for the next door are often behind the one before it.
+            </p>
+          </div>
+          <div class="brief-section">
+            <div class="brief-heading">Takedowns</div>
+            <p>
+              The quiet way. Sneak up behind a bot or sentry that hasn't noticed you and a white marker appears over it;
+              the Fire button reads TAKEDOWN. Press it to drop the bot without a sound. Sentries at their posts, bots
+              pausing between patrols and bots staring at a flare are easy to get behind. Walk up without sneaking and
+              they'll hear you. Each takedown is worth bonus heist points.
+            </p>
+          </div>
+          <div class="brief-section">
+            <div class="brief-heading">Your Gun</div>
+            <p>
+              Its cells glow brighter as it recharges and the arc at the muzzle lights when it's ready; the pips on the
+              back are your EMP charges. It picks its own ammo for whatever is in your sights, and the Fire button shows which. Patrol bots and
+              sentries drop to one stun shot, which never runs out and recharges in a moment. But every shot is loud:
+              bots nearby come to see where it came from, watchdogs hear it, and it costs your stealth grade. A watchdog shrugs off
+              stuns, so the gun switches to an EMP pulse, which knocks out everything around where it lands. You start
+              the early jobs with one EMP charge (⚡); from job 6 you start with none, and loot lockers sometimes hold one. Hold Fire (or press {forceEmp}) to
+              fire an EMP at anything. Sneaking shrinks how far a bot can spot you from.
+            </p>
+          </div>
+          <div class="brief-section">
+            <div class="brief-heading">Bodies</div>
+            <p>
+              A guard you put down stays where it fell, and a guard who comes across it goes to look, calls the others
+              over, and suspicion jumps 25%. The Detection % over a body is how easily a guard would spot it: under a working light a
+              guard spots it from as far as it would spot you; in a dim stretch only closer; in the pitch dark, or
+              inside a room, only when it all but trips over it. Furniture between hides it too. Drag it (Interact
+              beside it) somewhere darker and drop it (Interact again); how low is low enough is up to you. You move
+              slower with a body in tow, can't fire, and can't take it up or down the stairs.
+            </p>
+          </div>
+          <div class="brief-section">
+            <div class="brief-heading">Remote Traps</div>
+            <p>
+              You carry two. Press G (on a phone, Trap in your kit) to line one up: a dashed line on the floor shows where
+              it would roll and a ring its blast. It rolls up to two cells and stops short of a wall, or settles into a
+              watchdog pack's meeting point or a sentry's post on the way, and the ring turns green when it will. Turn to
+              aim, then roll it (G again, or Roll), so you never have to walk up to a watchdog to leave one; or set it
+              where you stand (Z, or Set here). Its camera watches the way you faced, and the feed shows in the corner,
+              even from the other floor. A trap arms itself in a second, and a blue laser tripwire
+              runs across it: anything that walks across the beam, or turns on the spot in it, sets it off a moment later, and
+              everything close by goes down, dogs and drones included. Something perfectly still never breaks the beam,
+              and you can also blow it by hand whenever you like (B, or Detonate). The bang is loud, so guards nearby come to look. Two can be out at
+              once; V switches between their cameras.
+            </p>
+          </div>
+          <div class="brief-section">
+            <div class="brief-heading">Your Torch</div>
+            <p>
+              It lights your way, but its beam gives you away: a guard who sees it on the floor down a corridor walks over to look.
+              Switch it off (T, or the torch button up top) and guards only spot you from much closer, but you'll only see the
+              floor right around you.
+            </p>
+          </div>
+          <div class="brief-section">
+            <div class="brief-heading">Sidestep &amp; Peek</div>
+            <p>
+              Q/E (or the &#9664; &#9654; buttons above the joystick) shift you sideways without turning — useful for slipping into a side passage while you're still
+              facing a threat ahead. While sneaking, the same keys lean you out just a little instead, letting you peek
+              around a corner and let go to snap back behind cover — you'll see more, but you're still exposing
+              yourself a bit, so don't linger.
+            </p>
+          </div>
+          <div class="brief-section">
+            <div class="brief-heading">Cover</div>
+            <p>
+              Go up to a desk, table, crate, rack or locker and you are in cover: your suit shimmers so you can see
+              you're tucked in. Nothing holds you there: walk, turn, dash, and you are in the open again as soon as you
+              step away. It's the furniture that hides you, not the shimmer. Low furniture (desks, tables, bins, crates)
+              only hides you while you're crouched: stand behind a desk and a bot sees you over it. Tall furniture
+              (racks, lockers, vending machines) always does. Aiming is its own key ({aim}, or Right Click, or the Aim
+              button) and works anywhere: you hold still while the crosshair is up, A/D (or the mouse) swing it, W/S tilt
+              it, Fire shoots, and the key again lowers the gun. When a bot walks past with its back to you, take it down.
+            </p>
+          </div>
+          <div class="brief-section">
+            <div class="brief-heading">Dodge</div>
+            <p>
+              Double-tap {strafeLeft} or {strafeRight} (or ◀ / ▶) to throw yourself to one side. A bot shot fired in that first moment goes
+              wide. It needs a couple of seconds to recover, and it's as loud as walking.
+            </p>
+          </div>
+          <div class="brief-section">
+            <div class="brief-heading">The Building</div>
+            <p>
+              Staff lockers line some corridors. Step inside (Interact) and nothing can see or reach you, not even a
+              watchdog; move to step out. Vent grilles at the foot of a wall are a crawl-through to the other side: a
+              short cut past whatever's in the way. With nothing else in your sights, the gun can shoot out a ceiling
+              light (bots see much less far in that dark patch) or knock over a bin or boxes to make a clatter that
+              nearby bots walk over to check. Both are still shots: loud, and they cost your grade.
+            </p>
+          </div>
+          <div class="brief-section">
+            <div class="brief-heading">Crates</div>
+            <p>Duck next to a crate and a bot can't make you out at all, even in the open — a guaranteed way to break a chase.</p>
+          </div>
+          <div class="brief-section">
+            <div class="brief-heading">Laser Beams</div>
+            <p>
+              Some corridors are barred by a glowing red trip-beam, and it stops you cold. Switch on your camo and the
+              beam can't register you, so you walk straight through.
+            </p>
+          </div>
+          <div class="brief-section">
+            <div class="brief-heading">Camo</div>
+            <p>
+              An optical cloak on a battery: about eight seconds on the move, twice that standing still, then it
+              recharges. While it's on you pass through lasers, and standing still, nothing can see you, not even up
+              close, unless it walks right into you, which breaks the cloak. Moving while cloaked, you're only as hidden
+              as you'd normally be. On a phone, hold the Sneak button to switch it on or off.
+            </p>
+          </div>
+          <div class="brief-section">
+            <div class="brief-heading">Flares</div>
+            <p>
+              Throw one down the corridor to light it up. Any bot close enough walks over to investigate until it
+              burns out — the way to lure a sentry off its door, or into your stun gun's range.
+            </p>
+          </div>
+          <div class="brief-section">
+            <div class="brief-heading">Blueprint</div>
+            <p>
+              Open the map ({map}) to see the floor plan drawn so far: everywhere you've been, plus whole sections a
+              server grid maps for you, with door letters and marked records rooms. The job pauses while it's open.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div class="map-card hidden" id="map-card" role="dialog" aria-modal="true" aria-label="Blueprint">
+        <div class="map-head">
+          <div class="map-tabs" id="map-tabs" role="tablist"></div>
+          <span class="map-paused">Paused</span>
+          <button class="map-music" id="music-btn" type="button" aria-pressed="true">♪ Music</button>
+          <button class="map-close" id="map-close" type="button" aria-label="Close blueprint">
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg>
+          </button>
+        </div>
+        <canvas class="map-canvas" id="map-canvas"></canvas>
+        <!-- The mission briefing, over the blueprint before a level (hud.ts's openMap with a briefing): where it is, what to do, and the way to begin. -->
+        <aside class="map-briefing hidden" id="map-briefing" aria-label="Mission briefing">
+          <div class="mb-kicker" id="mb-kicker"></div>
+          <div class="mb-title" id="mb-title"></div>
+          <div class="mb-sub" id="mb-sub"></div>
+          <div class="mb-label">Tasks</div>
+          <ol class="mb-tasks" id="mb-tasks"></ol>
+          <button class="btn btn-primary" id="mb-begin" type="button">Begin</button>
+        </aside>
+        <div class="map-foot">
+          <ul class="map-legend">
+            <li><i class="lg lg-door"></i>Locked door</li>
+            <li><i class="lg lg-ring"></i>Marked storage</li>
+            <li><i class="lg lg-laser"></i>Laser</li>
+            <li><i class="lg lg-crate"></i>Crate</li>
+            <li><i class="lg lg-hideout"></i>Hideout</li>
+            <li><i class="lg lg-vent"></i>Vent</li>
+            <li><i class="lg lg-pack"></i>Pack meets</li>
+            <li><i class="lg lg-dark"></i>Blackout</li>
+            <li><i class="lg lg-breaker"></i>Breaker</li>
+            <li><i class="lg lg-you"></i>You</li>
+          </ul>
+          <dl class="title-block">
+            <div><dt>Project</dt><dd>Blueprint Job</dd></div>
+            <div><dt>Job</dt><dd id="map-job">1</dd></div>
+            <div><dt>Sheet</dt><dd id="map-sheet">1 of 1</dd></div>
+            <div><dt>Scale</dt><dd>1 cell = 4 m</dd></div>
+          </dl>
+        </div>
+      </div>
+
+      <!-- End-of-job report: cleared or caught. See hud.ts's showReport(). -->
+      <!-- The handler's messages around the Daily Heist (shared/story.ts): the briefing before the run, the debrief after. -->
+      <div class="dossier hidden" id="dossier" role="dialog" aria-modal="true" aria-labelledby="dossier-greeting">
+        <div class="dossier-head">
+          <span class="dossier-kicker" id="dossier-kicker"></span>
+          <span class="dossier-stamp" aria-hidden="true">Eyes only</span>
+        </div>
+        <h2 class="dossier-greeting" id="dossier-greeting"></h2>
+        <div class="dossier-body" id="dossier-body"></div>
+        <!-- Notes from Control that change the rules for this job (a twist, the laser gates): a box each, so none is missed. -->
+        <div class="dossier-notes" id="dossier-notes" hidden></div>
+        <div class="dossier-params-title" id="dossier-params-title">Mission parameters</div>
+        <ol class="dossier-params" id="dossier-params"></ol>
+        <p class="dossier-closing" id="dossier-closing"></p>
+        <p class="dossier-sign">Control</p>
+        <p class="dossier-case" id="dossier-case" hidden></p>
+        <!-- The way in, picked before Accept (entries.ts); hidden when a job offers only one. -->
+        <div class="dossier-entries" id="dossier-entries" hidden>
+          <div class="dossier-params-title">Your way in</div>
+          <div class="dossier-entry-list" id="dossier-entry-list" role="radiogroup" aria-label="Your way in"></div>
+        </div>
+        <!-- The AI partner, opted into (or out of) for this job on the letter, so it can be chosen for any job and not only from the first brief. -->
+        <label class="coop-toggle" id="dossier-coop" for="dossier-coop-toggle" hidden>
+          <input type="checkbox" id="dossier-coop-toggle" />
+          <span class="coop-toggle-text">
+            <span class="coop-toggle-title">Play with an AI partner</span>
+            <span class="coop-toggle-note" id="dossier-coop-note"></span>
+          </span>
+        </label>
+        <div class="dossier-actions">
+          <button class="btn btn-primary" id="dossier-primary" type="button"></button>
+          <button class="btn btn-secondary" id="dossier-secondary" type="button" hidden></button>
+        </div>
+      </div>
+
+      <div class="report-card hidden" id="report-card" role="dialog" aria-labelledby="report-title">
+        <div class="report-head">
+          <div>
+            <div class="report-kicker" id="report-kicker"></div>
+            <div class="report-title" id="report-title"></div>
+          </div>
+          <div class="report-stamp" id="report-stamp">
+            <span class="report-grade" id="report-grade"></span>
+            <span class="report-stamp-label" id="report-stamp-label">Stealth</span>
+          </div>
+        </div>
+        <p class="report-note" id="report-note"></p>
+        <!-- What the mission did to the run, and what the next one carries in (hud.ts's showReport). -->
+        <div class="report-fallout" id="report-fallout" hidden>
+          <div class="report-section-title" id="fallout-title">The case</div>
+          <ul class="fallout-list" id="fallout-lines"></ul>
+          <div class="case-meter" id="case-meter" hidden>
+            <div class="case-bar" id="case-bar"><i class="case-fill" id="case-fill"></i></div>
+            <div class="case-caption" id="case-caption"></div>
+          </div>
+          <div class="report-section-title" id="fallout-next-title">Next mission</div>
+          <ul class="fallout-list" id="fallout-next"></ul>
+        </div>
+        <dl class="report-stats" id="report-stats"></dl>
+        <div class="report-points" id="report-points"></div>
+        <!-- One tap on how the job felt, counted for the difficulty tally (shared/tries.ts). -->
+        <div class="report-feel" id="report-feel" hidden>
+          <span class="report-feel-q" id="report-feel-q">How did that job feel?</span>
+          <div class="report-feel-btns">
+            <button class="btn btn-secondary" type="button" data-feel="easy">Easy</button>
+            <button class="btn btn-secondary" type="button" data-feel="right">About right</button>
+            <button class="btn btn-secondary" type="button" data-feel="hard">Too hard</button>
+          </div>
+        </div>
+        <div class="report-board" id="report-board">
+          <div class="report-board-title" id="report-board-title">Leaderboard</div>
+          <ol class="report-board-list" id="report-board-list"></ol>
+          <p class="report-board-note" id="report-board-note"></p>
+        </div>
+        <!-- Everyone who's played here and how far they've got: the board that shows progress, not only clears (hud.ts's setReportCommunity). -->
+        <div class="report-community" id="report-community" hidden>
+          <div class="report-board-title">Agents here</div>
+          <p class="community-line" id="community-line"></p>
+          <ol class="report-board-list" id="community-list"></ol>
+        </div>
+        <!-- A daily run's result, to paste into the post's comments. -->
+        <div class="report-share" id="report-share" hidden>
+          <span class="report-share-text" id="report-share-text"></span>
+          <button class="btn btn-secondary report-share-btn" id="report-share-btn" type="button">Copy</button>
+        </div>
+        <button class="btn btn-primary report-continue" id="report-continue" type="button"></button>
+        <button class="btn btn-secondary report-continue" id="report-secondary" type="button" hidden></button>
+      </div>
+
+      <!-- Weapon recharge indicator — always visible, not just on touch
+           devices: the Fire button's own dimmed state (controls-touch.ts)
+           only exists on mobile, so a keyboard/mouse player firing during
+           cooldown previously got no feedback at all for why nothing
+           happened. See hud.ts's setFireCharge(). -->
+      <div class="weapon-status" id="weapon-status">
+        <button class="gun-chip" id="gun-chip" type="button" aria-label="Choose a gun"><span id="gun-chip-name">Stun</span><kbd id="gun-chip-key">2</kbd></button>
+        <span class="weapon-label" id="weapon-label">Fire</span>
+        <div class="weapon-bar"><div class="weapon-fill ready" id="weapon-fill"></div></div>
+        <span class="weapon-state" id="weapon-state">READY</span>
+        <span class="emp-count" id="emp-count" title="EMP charges">⚡1</span>
+        <span class="camo-gauge">
+          <span class="weapon-label camo-label">Camo</span>
+          <span class="weapon-bar"><span class="camo-fill ready" id="camo-fill"></span></span>
+        </span>
+      </div>
+
+      <!-- The gun menu: pick the stun pistol or a heavy gun (hud.ts's wireGunMenu()). Opens from the chip by Fire, G, or the kit's Gun button. -->
+      <div class="gun-menu hidden" id="gun-menu" role="dialog" aria-modal="true" aria-label="Choose a gun">
+        <div class="gun-menu-card">
+          <header class="gun-menu-head">
+            <h2>Choose a gun</h2>
+            <button class="gun-menu-close" id="gun-menu-close" type="button" aria-label="Close">×</button>
+          </header>
+          <div class="gun-grid" id="gun-grid"></div>
+          <p class="gun-note">The game is paused while you choose. Press a number to pick, <kbd id="gun-note-key">2</kbd> or Esc to close. Every gun stuns the same for now: they differ in how the shot looks and sounds.</p>
+        </div>
+      </div>
+
+      <!-- Grip: the agent's own strength while hanging from a grapple line (grapple.ts). A drop of sweat swells as it runs out. -->
+      <div class="strain" id="strain" hidden>
+        <span class="strain-drop" id="strain-drop"></span>
+        <span class="weapon-label">Grip</span>
+        <div class="weapon-bar"><div class="strain-fill" id="strain-fill"></div></div>
+      </div>
+
+      <!-- Recon (hud.ts's setTour): the fly-over of the objectives and the way out, held at each stop until Next. -->
+      <div class="tour hidden" id="tour" aria-live="polite">
+        <div class="tour-bar tour-bar-top">
+          <span class="tour-kicker" id="tour-kicker">Recon</span>
+          <button class="tour-skip" id="tour-skip" type="button">Skip</button>
+        </div>
+        <div class="tour-pin hidden" id="tour-pin" aria-hidden="true"><i></i><b id="tour-pin-label"></b></div>
+        <div class="tour-bar tour-bar-bottom">
+          <div class="tour-caption">
+            <div class="tour-title" id="tour-title"></div>
+            <div class="tour-text" id="tour-text"></div>
+          </div>
+          <button class="tour-next" id="tour-next" type="button">Next</button>
+        </div>
+      </div>
+
+      <!-- How visible each body near you lies, over the body (hud.ts's setBodyMeters). -->
+      <div class="body-meters" id="body-meters" aria-hidden="true"></div>
+
+      <!-- The agent's PDA: the heist loop's checklist (hud.ts's setPda), and the photo it takes of each file. -->
+      <div class="pda hidden" id="pda" aria-live="polite">
+        <div class="pda-head">
+          <span>PDA</span>
+          <span class="pda-chip" id="pda-chip"></span>
+          <button class="pda-msg pda-recon" id="pda-recon" type="button" aria-label="Recon: fly over the objectives and the way out (O)">
+            <svg viewBox="0 0 16 12" width="14" height="11" aria-hidden="true"><circle cx="8" cy="6" r="3" fill="none" stroke="currentColor" stroke-width="1.5" /><path d="M0.8 6C2.6 2.6 5.2 1 8 1s5.4 1.6 7.2 5c-1.8 3.4-4.4 5-7.2 5S2.6 9.4 0.8 6Z" fill="none" stroke="currentColor" stroke-width="1.5" /></svg>
+            <span>Recon</span>
+          </button>
+          <button class="pda-msg pda-recon" id="pda-guide" type="button" aria-pressed="true" aria-label="Guide: an arrow on the floor to your next objective (P)">
+            <svg viewBox="0 0 16 12" width="14" height="11" aria-hidden="true"><path d="M8 1 14 11 8 8.5 2 11Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" /></svg>
+            <span>Guide</span>
+          </button>
+          <button class="pda-msg" id="pda-msg" type="button" aria-label="Read the brief (L)">
+            <svg viewBox="0 0 16 12" width="14" height="11" aria-hidden="true"><rect x="0.75" y="0.75" width="14.5" height="10.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5" /><path d="M1 1.5 8 7l7-5.5" fill="none" stroke="currentColor" stroke-width="1.5" /></svg>
+            <span>Brief</span>
+          </button>
+          <span class="pda-signal" aria-hidden="true"><i></i><i></i><i></i></span>
+          <button class="pda-toggle" id="pda-toggle" type="button" aria-expanded="true" aria-label="Minimise the PDA"></button>
+        </div>
+        <ul class="pda-list">
+          <li id="pda-uplink"><span class="pda-dot" aria-hidden="true"></span><span>Uplink</span><b></b></li>
+          <li id="pda-files"><span class="pda-dot" aria-hidden="true"></span><span>Files</span><b></b></li>
+          <li id="pda-logs"><span class="pda-dot" aria-hidden="true"></span><span>Logs</span><b></b></li>
+          <li id="pda-exit"><span class="pda-dot" aria-hidden="true"></span><span>Exit</span><b></b></li>
+        </ul>
+        <div class="pda-next hidden" id="pda-next" aria-live="off"></div>
+        <div class="pda-shot hidden" id="pda-shot" aria-hidden="true">
+          <div class="pda-page"><i></i><i></i><i></i><i></i><i></i></div>
+          <span id="pda-shot-label">Captured</span>
+        </div>
+      </div>
+
+      <!-- Infrared view: what the heat bodies in range add up to (hud.ts's setInfrared). -->
+      <div class="ir-readout" id="ir-readout" role="status" aria-live="off" hidden></div>
+
+      <!-- How exposed the agent is to the guards near them; only up while one is about (hud.ts's setVisibility). -->
+      <div class="visibility" id="visibility" role="status" aria-live="off" hidden>
+        <span class="visibility-caption">VISIBILITY</span>
+        <div class="visibility-bar"><div class="visibility-fill" id="visibility-fill"></div></div>
+        <span class="visibility-word" id="visibility-word"></span>
+      </div>
+
+      <!-- Lining up a trap: its path and blast are drawn on the floor (trapAim.ts); roll it along them, or set it where you stand. -->
+      <div class="trap-aim hidden" id="trap-aim">
+        <span class="trap-aim-hint">Turn to aim · roll a trap along the line, or dash to its end</span>
+        <button class="trap-aim-btn trap-aim-roll" id="trap-roll" type="button">Roll<kbd>{trap}</kbd></button>
+        <button class="trap-aim-btn" id="trap-here" type="button">Set here<kbd>{trapHere}</kbd></button>
+        <button class="trap-aim-btn trap-aim-dash" id="trap-dash" type="button">Dash<kbd>{interact}</kbd></button>
+        <button class="trap-aim-btn trap-aim-cancel" id="trap-cancel" type="button" aria-label="Cancel">✕<kbd>Esc</kbd></button>
+      </div>
+
+      <!-- Terminal hack progress — top-centre, clear of every touch control. -->
+      <div class="hack-status hidden" id="hack-status">
+        <span class="hack-label" id="hack-label"></span>
+        <div class="hack-bar"><div class="hack-fill" id="hack-fill"></div></div>
+      </div>
+
+      <!-- The AI partner (AI co-op): backing you up, or down, and the progress of bringing them round (hud.ts's setPartner()). -->
+      <div class="partner-pill hidden" id="partner-pill" role="status">
+        <span class="partner-text" id="partner-text"></span>
+        <div class="partner-bar hidden" id="partner-bar"><div class="partner-fill" id="partner-fill"></div></div>
+      </div>
+
+      <!-- A first-use hint on a touch screen, pointing at the control it's about — see hud.ts's showHint(). -->
+      <div class="first-hint hidden" id="first-hint" role="status"></div>
+
+      <!-- Toast notifications -->
+      <div class="toast-stack" id="toast-stack"></div>
+      <div class="notif-panel hidden" id="notif-panel" role="dialog" aria-label="Messages">
+        <div class="notif-head">
+          <span class="notif-title">Messages</span>
+          <span class="notif-paused">Paused</span>
+          <button class="notif-close" id="notif-close" type="button" aria-label="Close messages">&times;</button>
+        </div>
+        <div class="notif-body" id="notif-body"></div>
+      </div>
+      <!-- Held upright on a phone: the game is built for landscape, and Landscape turns it (orientation.ts, public/landscape.html). Put away with the cross, for the rest of the visit. -->
+      <div class="rotate-hint" id="rotate-hint" role="status" hidden>
+        <span class="rotate-hint-phone" aria-hidden="true"></span>
+        <span class="rotate-hint-text" id="rotate-hint-text">Play in landscape? Tap Landscape, then turn your phone sideways</span>
+        <button class="rotate-hint-lock" id="rotate-hint-lock" type="button">Landscape</button>
+        <button class="rotate-hint-close" id="rotate-hint-close" type="button" aria-label="Play upright instead">&times;</button>
+      </div>
+
+      <!-- A remote trap's camera: game.ts draws the feed onto the canvas under the see-through window. See hud.ts's setTrapFeed(). -->
+      <div class="trap-panel hidden" id="trap-panel">
+        <div class="trap-head">
+          <span class="trap-title" id="trap-title">Trap cam</span>
+          <span class="trap-status" id="trap-status">Arming</span>
+          <button class="trap-next" id="trap-next" type="button" aria-label="Next trap (V)">▶</button>
+        </div>
+        <div class="trap-feed" id="trap-feed"></div>
+        <button class="trap-blast" id="trap-blast" type="button">Detonate <kbd>B</kbd></button>
+      </div>
+
+      <!-- Training: the coach says what to do at each station — see hud.ts's setCoach(). -->
+      <div class="coach hidden" id="coach" aria-live="polite">
+        <div class="coach-head">
+          <span class="coach-kicker" id="coach-kicker">Training</span>
+          <span class="coach-pips" id="coach-pips"></span>
+        </div>
+        <div class="coach-title" id="coach-title"></div>
+        <p class="coach-text" id="coach-text"></p>
+        <span class="coach-fold" aria-hidden="true"></span>
+      </div>
+
+      <!-- Dramatic "caught by a bot" flash text — see hud.ts's showSpottedBanner() -->
+      <div class="spotted-banner hidden" id="spotted-banner"></div>
+      <!-- Red edge glow that rises with suspicion and pulses when you're hit. -->
+      <div class="danger-vignette" id="danger-vignette"></div>
+    </div>
+
+    <!-- Touch controls: a fixed joystick (bottom-left, drag for turn +
+         throttle) plus Fire, Flare, Sneak toggle, and the context-sensitive
+         Interact button (bottom-right). Joystick/Fire/Flare/Sneak are hidden
+         on non-touch devices (shown on any real touch) via
+         controls-touch.ts; Interact is also shown on desktop as a
+         mouse-clickable fallback alongside its E/Space/Enter shortcut. -->
+    <!-- Offered when a guard or a dog has the agent: a pulsing button (a key hint on a desktop) and the white-out when a flash goes off (hud.ts). -->
+    <button class="flash-prompt hidden" id="flash-prompt" type="button" aria-label="Throw a flash grenade">
+      <span class="flash-prompt-label">Flash</span>
+      <kbd id="flash-prompt-key">1</kbd>
+      <em id="flash-prompt-count">2</em>
+    </button>
+    <!-- Bullet time (bullettime.ts): offered when something closes in (Space), a draining bar while it lasts. -->
+    <button class="flash-prompt bullet-prompt hidden" id="bullet-prompt" type="button" aria-label="Bullet time: slow the world down">
+      <span class="flash-prompt-label" id="bullet-prompt-label">Bullet time</span>
+      <kbd id="bullet-prompt-key">Space</kbd>
+      <i class="bullet-bar"><i id="bullet-bar-fill"></i></i>
+    </button>
+    <!-- Offered with the flash: smoke when a guard has the agent, a shock grenade when a dog does. -->
+    <button class="flash-prompt grenade-prompt smoke-prompt hidden" id="smoke-prompt" type="button" aria-label="Throw a smoke grenade">
+      <span class="flash-prompt-label">Smoke</span>
+      <kbd id="smoke-prompt-key">3</kbd>
+      <em id="smoke-prompt-count">2</em>
+    </button>
+    <button class="flash-prompt grenade-prompt shock-prompt hidden" id="shock-prompt" type="button" aria-label="Throw a shock grenade">
+      <span class="flash-prompt-label">Shock</span>
+      <kbd id="shock-prompt-key">4</kbd>
+      <em id="shock-prompt-count">2</em>
+    </button>
+    <div class="flash-out" id="flash-out" aria-hidden="true"></div>
+    <!-- Aiming from cover: the crosshair, always at the middle of the view; it reddens with a guard in the sights. -->
+    <!-- Watchdog warning: a marker on each dog near or on your trail (an arrow on the screen's edge when it is out of view), and a red pulse round the edges when one is close. -->
+    <div class="dog-warns" id="dog-warns" aria-hidden="true"><div class="dog-vignette" id="dog-vignette"></div></div>
+    <div class="crosshair hidden" id="crosshair" aria-hidden="true"><i></i><i></i><i></i><i></i><b></b></div>
+    <div class="touch-controls hidden-controls" id="touch-controls">
+      <div class="joystick-base" id="joystick-base">
+        <div class="joystick-thumb" id="joystick-thumb"></div>
+      </div>
+      <!-- Hold to sidestep (Q/E on keyboard); while sneaking, a short
+           spring-back peek around a corner instead. -->
+      <div class="strafe-pad">
+        <button class="strafe-btn" id="strafe-left-btn" aria-label="Sidestep or peek left">&#9664;</button>
+        <button class="strafe-btn" id="strafe-right-btn" aria-label="Sidestep or peek right">&#9654;</button>
+      </div>
+      <button class="fire-btn" id="fire-btn">Fire</button>
+      <button
+        class="duck-btn"
+        id="duck-btn"
+        hidden
+        aria-label="Duck behind cover"
+      >
+        Duck
+      </button>
+      <!-- The kit (touch screens): tap the case and the tools fan out around it,
+           in reach of the right thumb; using one folds them away. See hud.ts's wireKit(). -->
+      <div class="kit" id="kit">
+        <button class="kit-tool" id="kit-trap" type="button" style="--a: -86deg" aria-label="Trap: aim a roll or set one here">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+            <ellipse cx="12" cy="16" rx="8" ry="3.2" fill="none" stroke="currentColor" stroke-width="1.6" />
+            <path d="M12 12.8V7M9.5 5.5h5v2.5h-5z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
+          </svg>
+          <span>Trap</span>
+          <em class="kit-count" id="kit-trap-count">2</em>
+        </button>
+        <button class="kit-tool kit-flare" id="flare-btn" type="button" style="--a: -104deg" aria-label="Throw a flare">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+            <path d="M12 3c1 3.5 5 5.5 5 10a5 5 0 0 1-10 0c0-2.2 1-3.6 2.2-4.8.3 1.8 1.2 2.8 2.3 3.1C11 9.3 11.2 6 12 3z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
+          </svg>
+          <span>Flare</span>
+        </button>
+        <button class="kit-tool" id="kit-torch" type="button" style="--a: -158deg" aria-label="Switch torch off" aria-pressed="true">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+            <path d="M8 3h8l-1.5 6h-5z M9.5 9h5v11.5a1 1 0 0 1-1 1h-3a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
+            <path class="torch-cross" d="M4 20L20 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+          </svg>
+          <span>Torch</span>
+        </button>
+        <button class="kit-tool" id="kit-goggles" type="button" style="--a: -176deg" aria-label="Put night vision on" aria-pressed="false">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+            <path d="M6.5 10l1.5-3.5h8l1.5 3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
+            <path d="M2.5 10.5h19v5a2 2 0 0 1-2 2h-4l-2-2.5h-3l-2 2.5h-4a2 2 0 0 1-2-2z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
+          </svg>
+          <span>Night</span>
+          <i class="kit-charge"><i id="kit-goggles-fill"></i></i>
+        </button>
+        <button class="kit-tool" id="kit-map" type="button" style="--a: -194deg" aria-label="Open blueprint">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+            <path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z M9 4v14 M15 6v14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
+          </svg>
+          <span>Map</span>
+        </button>
+        <button class="kit-tool" id="kit-grapple" type="button" style="--a: -212deg" aria-label="Grapple up to the pipes overhead">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+            <path d="M12 21V8 M12 8c-3 0-5-1.6-5-4 M12 8c3 0 5-1.6 5-4 M8 21h8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+          <span>Grapple</span>
+        </button>
+        <button class="kit-tool" id="kit-flash" type="button" style="--a: -122deg" aria-label="Throw a flash grenade">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="1.6" /><path d="M12 2.5v4M12 17.5v4M2.5 12h4M17.5 12h4M5.3 5.3l2.8 2.8M15.9 15.9l2.8 2.8M18.7 5.3l-2.8 2.8M8.1 15.9l-2.8 2.8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg>
+          <span>Flash</span>
+          <em class="kit-count" id="kit-flash-count">2</em>
+        </button>
+        <button class="kit-tool" id="kit-smoke" type="button" style="--a: -68deg" aria-label="Throw a smoke grenade: blinds guards">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M7 18a3.5 3.5 0 0 1-.4-7 4.5 4.5 0 0 1 8.6-1A3.8 3.8 0 0 1 17 18z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" /></svg>
+          <span>Smoke</span>
+          <em class="kit-count" id="kit-smoke-count">2</em>
+        </button>
+        <button class="kit-tool" id="kit-shock" type="button" style="--a: -230deg" aria-label="Throw a shock grenade: blinds dogs">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M13 2.5L5.5 13H11l-1 8.5L18.5 10H13z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" /></svg>
+          <span>Shock</span>
+          <em class="kit-count" id="kit-shock-count">2</em>
+        </button>
+        <button class="kit-tool" id="kit-gun" type="button" style="--a: -140deg" aria-label="Change gun">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+            <path d="M2.5 9.5h14l2-2h3v4h-3.5l-1 1.5H11l-1 4.5H6.5l1-4.5H2.5z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
+          </svg>
+          <span id="kit-gun-name">Stun</span>
+        </button>
+        <button class="kit-btn" id="kit-btn" type="button" aria-expanded="false" aria-label="Open your kit">
+          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+            <path d="M3.5 8.5h17v10a1.5 1.5 0 0 1-1.5 1.5H5a1.5 1.5 0 0 1-1.5-1.5z M9 8.5V6a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2.5 M3.5 12.5h17 M11 12.5v2h2v-2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
+          </svg>
+        </button>
+      </div>
+      <button class="sneak-btn" id="sneak-btn" aria-label="Sneak (hold for camo)">Sneak</button>
+      <!-- What a long press does, over Fire and Sneak for a new player's first few jobs (hud.ts's noteTouchJob()). -->
+      <span class="hold-cap hold-cap-fire" aria-hidden="true">Hold · EMP</span>
+      <span class="hold-cap hold-cap-sneak" aria-hidden="true">Hold · Camo</span>
+      <button class="interact-btn hidden" id="interact-btn">Interact</button>
+    </div>
+
+    <script type="module" src="game.ts" defer></script>
+  </body>
+</html>
