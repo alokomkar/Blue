@@ -89,6 +89,7 @@ Everything under `public/models` is CC0 (Quaternius) or original work; see
 
 - [`docs/PLAN.md`](docs/PLAN.md): goals, how each Meta model is used, expected result, phases and risks.
 - [`docs/DESIGN.md`](docs/DESIGN.md): the level spec, the verifier, the endpoints, the order grammar and the first two days' task list.
+- [`docs/HISTORY.md`](docs/HISTORY.md): every commit in plain terms (input, output, screenshots) and a summary at the end of each phase.
 - [`docs/SPIKES.md`](docs/SPIKES.md): the first calls to the Meta Model API: what worked, timings, and what changed in the plan.
 - [`docs/GAMEPLAY.md`](docs/GAMEPLAY.md): the gameplay track (smarter enemies, snipers, the taller bunker).
 - [`docs/index.html`](docs/index.html): the same plan as an interactive page.
