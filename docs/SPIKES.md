@@ -52,3 +52,12 @@ page needs a progress line ("finding rooms… tracing walls…").
 - Spike 2 from the plan: a hand-built grid with a loop in the maze game (guards, cameras, partner).
 - The three real phone photos of sketches (the generated sketch is a stand-in and a fixture: `public/fallback/scans/sketch1.jpg`).
 - Door detection by ink threshold, and the grid-to-level loader.
+
+## Addendum: the Director, live (spike 7, Oct 26 22:58 IST)
+
+`scripts/spikes/spike7_director.mjs` runs the Director through its endpoint handler. Museum request: pass in 1 round
+(3.0 s). Refinery request: `exit_close` twice, pass in round 3 (6.6 s). A bank-heist request was rejected by Meta's input
+filter ("The response was filtered due to the prompt triggering our content management policy", HTTP 400). The same
+request passed on other tries and with a shorter system prompt, so the filter is borderline and not deterministic: a rejected call is tried once
+more, then the Director falls back to a verified level and reports `request_rejected`. Plan: show the fallback as "the closest level we could
+make" so a demo never dead-ends.

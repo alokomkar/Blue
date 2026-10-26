@@ -13,3 +13,4 @@ private-overlay/
 dist-original/
 scripts/private-rename.sed
 scripts/spikes/out/
+*.tsbuildinfo

@@ -236,11 +236,35 @@ Rooms recovered from the sketch, as a 16 x 16 grid (digits are rooms, dots are w
   Muse Image sketch. Linked from the README and the interactive page.
 - **In plain terms:** a diary of the project you can read without knowing git.
 
+### 32156b7 · 22:41 · Add local HTML pages for the project history, built from HISTORY.md
+- **Input:** you asked for the history as local HTML files, one per phase if needed.
+- **Output:** `docs/history.html` (overview with a card per part and a table of every commit) and one page per part
+  (`phase-0.html`, `pre-event.html`, `phase-1.html`), generated from this file by `node scripts/build-history.mjs`. Checked
+  headlessly: no errors, every image loads, no sideways scroll at phone width.
+- **In plain terms:** the diary now also exists as pages you can open from disk, and they update when this file does.
+
+### 09f7193 · 22:58 · Add the Heist Director: a request in words becomes a verified level, streamed round by round
+- **Input:** you asked me to write the Director's server side while the loader was being built.
+- **Output:** `POST /api/ai/director` streams events (`round`, `spec`, `verify`, `done`). Each round asks Muse Spark for a
+  level in the schema, runs the verifier, and sends the failures back as the next message, up to four rounds. If the
+  model is down or filters the request, a verified fallback level for the right place is returned (one per place, each
+  checked by a test). Finished requests are cached for an hour; a filtered call is retried once. 25 new tests, 945 in all,
+  type-check and lint clean. **Live, with your key:**
+  - "A night job at a museum: two guards, one dog, steal a painting from the vault." Passed in round 1, 3.0 s: a 10 x 7
+    museum, vault contract, 2 guards, 1 dog, the lights-out twist.
+  - "Quiet refinery sabotage, no dogs, small floor." Failed the exit-distance check twice (6 x 5, then 10 x 5), then
+    passed on round 3 (12 x 7), 6.6 s. The model changed only what the checker named.
+  - "A huge bank robbery with ten guards, five dogs, lasers everywhere and a lockdown." Meta's content filter rejected
+    it on both tries (it passed on other tries and with a shorter system prompt, so the filter is borderline), and the
+    fallback level, "The branch vault", came back, with the reason `request_rejected`.
+- **In plain terms:** you can now type what level you want, watch the AI build it, watch the checker say "the exit is too
+  close", and watch the AI fix it. The second example is the demo moment for "verifiable agent". The third shows the safety net.
+
 ### Phase 1 summary (so far, in progress)
-- **Achieved:** the API plumbing with a safe key path; the level spec and verifier; the Meta key tested against every
+- **Achieved:** the Heist Director's server side (live: one-round and three-round levels, a filtered request falling back safely); the API plumbing with a safe key path; the level spec and verifier; the Meta key tested against every
   model we plan to use; the three biggest risks (SAM on a sketch, structured output, voice latency) answered with real
   numbers; co-op on all four levels.
-- **Numbers:** 920 unit tests (836 at the baseline), lint and type-check clean, 19 commits.
-- **Still open in this phase:** loading a spec into the game (`?spec=`), the loop test (a layout with a loop, which the
-  game's tree-shaped mazes never had), the Vercel deployment, and your three real sketch photos.
-- **Next:** the loader and loop test (running now), then the Director's repair loop on the server, then the voice fast path.
+- **Numbers:** 945 unit tests (836 at the baseline), lint and type-check clean, 22 commits.
+- **Still open in this phase:** loading a spec into the game (`?spec=`; a helper is on it), the loop test (a layout with a
+  loop, which the game's tree-shaped mazes never had), the Vercel deployment, and your three real sketch photos.
+- **Next:** the page that shows the Director working (the streamed rounds), then the voice fast path, then the photo-to-map endpoint.
