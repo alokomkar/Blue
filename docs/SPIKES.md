@@ -104,3 +104,22 @@ The words appear first (`?stream=1`): about 1.7 s (compound) before the order, s
 Things learned: the tap of the recording graph (an `AudioWorkletNode` with no output) is held by the recorder so nothing can collect it while the key is down (hardening, not a proven fault); in the headless test setup an audio context's clock sometimes
 barely advanced (a clip of about a tenth of a second, reported by the page as "too short"), which a plain page in the same browser did not do and which a retry cleared, so it is treated as the test setup; Meta's input filter was not
 triggered by "take out the guard" (the phrase is softened to "stun" before it goes out anyway).
+
+### Six graphics ideas as prototypes (Oct 27, 02:00 IST)
+
+Each idea was injected into a scratch build of the committed game on the museum level (nothing is in the game's code): `docs/img/graphics-effects-sheet.jpg`
+(today, light shafts, colour grade, glossy floor), `graphics-surfaces.jpg`, `graphics-dressing.jpg`, `graphics-hero.jpg` (all together).
+
+| Idea | How it was made here | What a real version would be |
+|---|---|---|
+| Light shafts and a visible torch cone | Additive, soft-edged cone meshes under the lamps and along the torch, plus dust motes | The same meshes, with a noise scroll and a toggle in the quality setting |
+| Colour grade, vignette, grain, depth of field | CSS filters and overlays over the canvas (so the on-screen HUD is touched too) | A shader pass in the game's post-processing chain, per-place grade |
+| Glossy, reflective floor | A dark glossy decal with puddle blotches and long lamp streaks, above the fog-of-war layer | A planar reflection, or the same decals driven by the lamps in the level |
+| Better surfaces | A normal map and a roughness map computed in the page from the generated stone texture, on a lit slab beside the flat one | The same derivation, once, when the texture is made |
+| AI dressing | The generated carpet, paintings and plant sprites | The art made when the level is built, cached |
+| Meta-model visual QA | `scripts/spikes/spike11_visualqa.mjs`: Muse Spark looks at the screenshot | See below |
+
+**Muse Spark's critique of the combined shot** against a written style target (3.3 s): warm torch pools against cool shadows work (add a cool hemisphere light to widen the split); it
+saw no light shafts (add volumetric cones; they are there but faint, so it under-reports); the floor is matte (use a glossy standard material); the wall art makes the place specific
+(add picture lights); the image is too clean (film grain and vignette pass; they are there but faint). Overall 6 out of 10. So the critique is useful and mostly right, and it misses subtle effects:
+it works as a second pair of eyes, not as a judge.
