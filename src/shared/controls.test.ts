@@ -45,8 +45,8 @@ test('settings are read from an object or a JSON string, and anything else is no
 });
 
 test('keys that are not bindable, not actions, or on the same key twice are dropped', () => {
-  const p = parseControls({ keys: { torch: 'Escape', goggles: 'F1', nope: 'KeyY', flare: 'KeyJ', trap: 'KeyJ', camo: 'MetaLeft' } })!;
-  assert.deepEqual(p.keys, { flare: 'KeyJ' });
+  const p = parseControls({ keys: { torch: 'Escape', goggles: 'F1', nope: 'KeyY', flare: 'KeyI', trap: 'KeyI', camo: 'MetaLeft' } })!;
+  assert.deepEqual(p.keys, { flare: 'KeyI' });
   assert.equal(isBindable('Escape'), false);
   assert.equal(isBindable('Enter'), false);
   assert.equal(isBindable('ControlLeft'), false);
@@ -155,4 +155,17 @@ test('camera angle restores old saves, clamps invalid values and persists indepe
 test('aiming has its own key, / by default, which no other action uses', () => {
   assert.equal(DEFAULT_KEYS.aim, 'Slash');
   assert.equal(Object.values(DEFAULT_KEYS).filter((k) => k === 'Slash').length, 1);
+});
+
+test('push-to-talk: V by default (the next-trap camera moved to J to make room), rebindable like any key, and no clash with another default', () => {
+  assert.equal(DEFAULT_KEYS.talk, 'KeyV');
+  assert.equal(DEFAULT_KEYS.nextTrap, 'KeyJ');
+  assert.ok(ACTION_LABELS.talk.length > 0);
+  const moved = bind(DEFAULT_CONTROLS, 'talk', 'KeyY');
+  assert.equal(resolveKeys(moved).talk, 'KeyY');
+  assert.equal(actionOf(resolveKeys(moved), 'KeyV'), null);
+  // taking the key of another action swaps the two, so neither is left without one
+  const swapped = bind(DEFAULT_CONTROLS, 'talk', 'KeyG');
+  assert.equal(resolveKeys(swapped).talk, 'KeyG');
+  assert.equal(resolveKeys(swapped).trap, 'KeyV');
 });

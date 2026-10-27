@@ -5692,3 +5692,186 @@ body.notif-open .touch-controls {
 #boss-bar[data-state='held'] .boss-note {
   color: #4ee08a;
 }
+
+/* ---- voice orders for the AI partner (voice.ts, voicehud.ts): the push-to-talk button and the subtitle of what you said and what the partner answered. ---- */
+.voice-mic {
+  position: absolute;
+  right: max(14px, env(safe-area-inset-right));
+  top: calc(env(safe-area-inset-top) + 150px);
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(111, 224, 255, 0.55);
+  background: rgba(10, 13, 18, 0.82);
+  color: #cfeaf5;
+  cursor: pointer;
+  pointer-events: auto;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.voice-mic.hidden,
+.voice-sub.hidden {
+  display: none;
+}
+
+.voice-mic-key {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  min-width: 15px;
+  padding: 0 3px;
+  border-radius: 4px;
+  background: rgba(10, 13, 18, 0.95);
+  border: 1px solid rgba(111, 224, 255, 0.45);
+  font: 700 9px/14px ui-monospace, Menlo, Consolas, monospace;
+  text-align: center;
+  color: #9fd6e8;
+}
+
+.voice-mic.live {
+  border-color: #ff5a4a;
+  background: rgba(60, 12, 10, 0.9);
+  color: #ffd2cc;
+  box-shadow: 0 0 0 4px rgba(255, 90, 74, 0.25);
+}
+
+@media (pointer: coarse) {
+  .voice-mic-key {
+    display: none;
+  }
+}
+
+.voice-sub {
+  position: absolute;
+  left: 50%;
+  top: calc(env(safe-area-inset-top) + 146px);
+  transform: translateX(-50%);
+  width: min(560px, calc(100vw - 32px));
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: stretch;
+  pointer-events: none;
+  font: 600 13px/1.35 ui-monospace, 'IBM Plex Mono', Menlo, Consolas, monospace;
+  letter-spacing: 0.05em;
+  transition: opacity 0.5s ease;
+}
+
+.voice-sub.fading {
+  opacity: 0;
+}
+
+.voice-you,
+.voice-reply {
+  padding: 5px 11px 5px 10px;
+  border-left: 3px solid rgba(111, 224, 255, 0.8);
+  border-radius: 2px;
+  background: rgba(8, 14, 20, 0.86);
+  color: #d7eef7;
+}
+
+.voice-you:empty,
+.voice-reply:empty {
+  display: none;
+}
+
+.voice-you.listening {
+  border-left-color: #ff5a4a;
+  color: #ffd2cc;
+}
+
+.voice-you.listening::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 8px;
+  border-radius: 50%;
+  background: #ff5a4a;
+  animation: voice-blink 1s ease-in-out infinite;
+}
+
+.voice-you.wait {
+  color: #9fb4bf;
+}
+
+.voice-you.error,
+.voice-reply.error {
+  border-left-color: #ffb02e;
+  background: rgba(30, 22, 6, 0.88);
+  color: #ffd488;
+}
+
+.voice-you.info {
+  border-left-color: #8a96a3;
+  color: #c3ced6;
+}
+
+.voice-reply {
+  border-left-color: #6fcf97;
+  background: rgba(8, 20, 14, 0.88);
+  color: #d6f5e2;
+}
+
+.voice-reply.dim {
+  border-left-color: #8a96a3;
+  background: rgba(12, 14, 18, 0.85);
+  color: #aab4be;
+  font-style: italic;
+}
+
+.voice-meter {
+  display: inline-block;
+  vertical-align: middle;
+  margin-left: 10px;
+  width: 70px;
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+
+.voice-meter i {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: #ff8a7c;
+}
+
+@keyframes voice-blink {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+body.map-open .voice-sub,
+body.modal-open .voice-sub {
+  display: none;
+}
+
+@media (pointer: coarse), (max-width: 620px), (max-height: 480px) {
+  .voice-sub {
+    top: calc(env(safe-area-inset-top) + 132px);
+    width: min(420px, 60vw);
+    font-size: 11px;
+  }
+  /* (Left side, between the PDA and the sticks: the right hand's side is the buttons.) */
+  .voice-mic {
+    right: auto;
+    left: max(16px, env(safe-area-inset-left));
+    top: calc(env(safe-area-inset-top) + 108px);
+    width: 52px;
+    height: 52px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .voice-you.listening::before {
+    animation: none;
+  }
+}

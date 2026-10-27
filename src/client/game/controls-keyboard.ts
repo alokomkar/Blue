@@ -74,7 +74,7 @@ export type KeyboardCallbacks = {
   onTorch: () => void;
   /** R: night-vision goggles on or off. */
   onGoggles: () => void;
-  /** G sets a remote trap; B blows the one on camera; V shows the next trap's camera. */
+  /** G sets a remote trap; B blows the one on camera; J shows the next trap's camera (V is the push-to-talk key, voice.ts). */
   onTrap: () => void;
   /** Z: a trap at your feet (or, while lining up a roll, there instead). */
   onTrapHere: () => void;
@@ -103,8 +103,8 @@ export function easeAxis(current: number, target: number, dt: number, rate: numb
 }
 
 const HELD_ACTIONS = ['forward', 'back', 'turnLeft', 'turnRight', 'strafeLeft', 'strafeRight'];
-/** What does not count as "another key" to someone aiming from cover: turning and sliding steer and place the shot, Fire takes it. */
-const STEERING_ACTIONS = ['turnLeft', 'turnRight', 'strafeLeft', 'strafeRight', 'fire', 'aim'];
+/** What does not count as "another key" to someone aiming from cover: turning and sliding steer and place the shot, Fire takes it, and talking to the partner (voice.ts holds that key itself) stays out of the way. */
+const STEERING_ACTIONS = ['turnLeft', 'turnRight', 'strafeLeft', 'strafeRight', 'fire', 'aim', 'talk'];
 
 export function initKeyboardControls(
   callbacks: KeyboardCallbacks,
