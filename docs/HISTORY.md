@@ -380,12 +380,61 @@ Rooms recovered from the sketch, as a 16 x 16 grid (digits are rooms, dots are w
 |---|---|
 | ![panorama](img/graphics-panorama.jpg) | ![mask](img/graphics-cutout-mask.jpg) |
 
+### 401c0b4 · 06:18 · Docs: a museum level dressed with the generated art, before and after
+- **Input:** you asked to see a sample level with the new graphics.
+- **Output:** the before and after screenshots and the finding about the fog-of-war layer, added to the spike notes and history.
+- **In plain terms:** proof that the AI-made art looks right in the game.
+
+### 302361f · 06:20 · Add the voice order pipeline on the server: orders, a local fast path, transcribe and order endpoints
+- **Input:** your go-ahead for the voice fast path, from the spike that took 4 to 5 s.
+- **Output:** a local fast path that recognises a whole obvious sentence ("cover me", "hold", "follow me", "regroup", "wait at the lift",
+  "take the guard") with no model call, so "I will hold the door" goes to the model; a transcribe endpoint that sends a WAV (mono 16-bit, up to 10 s)
+  to Muse Voice Transcribe with the game's vocabulary as keywords, then the fast path, then Muse Spark for the rest (first step of a compound command);
+  `?stream=1` sends the words first; a typed twin endpoint `order`. Measured through the real endpoint: the fast path 0.9 to 1.7 s end to end (median about
+  1.0 s, nearly all transcription), the model path 2.3 to 3.4 s, a compound command 3.5 to 4.3 s. 1045 tests with this commit alone.
+- **In plain terms:** saying "cover me" now costs about one second of waiting, not four or five.
+
+### 2173add · 06:20 · Add the voice client: push-to-talk, WAV encoder, subtitles, and order-to-plan mapping
+- **Input:** the same feature, the browser half.
+- **Output:** hold **V** (rebindable; the next-trap camera moved to J) or the mic button to record up to 6 s; the page encodes mono 16-bit WAV, shows the transcript
+  at once, then the partner's reply. The microphone is asked for on the first press only, a one-time line says the clip goes to Meta's model, and the tracks stop on release,
+  window blur or job end. A mapping turns each order into a plan for the partner. 1072 tests with this commit.
+- **In plain terms:** the part you actually use: press, talk, let go.
+
+### 3837c32 · 06:28 · Wire voice orders into the game and document the measured latencies
+- **Input:** the pieces above needed connecting inside the game.
+- **Output:** the game.ts wiring. **What each order does:** hold (stands still until follow or regroup, you are over 30 m away or on another floor, or you step into the exit); follow
+  (releases it); cover me (a console lookout for 30 s within 9 m); take (stuns the nearest visible guard or dog within 12 m for up to 5 s, else "No clear shot"); distract
+  (simplified: a clatter where it stands, then it holds); wait at the lift (goes to the exit cab, also from another storey); regroup (the existing blink). It still
+  shoots a guard that is on you under every order. Tested with a fake microphone feeding clips spoken by the Mac: cover me, hold, follow, regroup, lift, take the guard, the
+  console sentence, a compound command, and chatter ("what a nice day" is NOT AN ORDER); the partner obeyed (hold moved it 0 m across a 24 m walk; cover me downed a guard in 0.5 s
+  against not downed in 5 s without it); the denied-microphone, server-down and no-partner paths say so on screen. In the page, from letting go to the reply: about 2.0 s for the
+  fast path, 4.3 s for the model path, 4.6 to 4.9 s for a compound command (a touch over the 4.5 s target). 1072 tests, lint, build, four levels with the partner loaded without errors.
+- **In plain terms:** you can talk to your partner. Try it on the live build or the snapshots with `&coop=ai`, or type `window.__order("cover me")` in the browser console without a microphone.
+
+### 2c64a5f · 06:28 · Prototype six graphics ideas on a museum level and ask Muse Spark to critique them
+- **Input:** you named Splinter Cell Blacklist as the graphics standard and Black State as a thematic match, and asked what the six listed graphics ideas look like.
+- **Output:** each idea injected into a scratch build of the game on the museum level (nothing in the game's code): light shafts and a torch cone, a colour grade with vignette, grain and
+  depth of field, a glossy floor, normal and roughness maps derived from the generated texture (flat beside rich), the AI carpet, paintings and plants, and all together. Muse Spark
+  critiqued the combined shot against a written style target: 6 of 10, with specific, mostly right fixes (a cool hemisphere light, volumetric cones, a glossy floor material,
+  picture lights, a film and vignette pass), though it missed the faint shafts and grain that were there.
+- **In plain terms:** this is the direction. The prototypes are rough (the grade is a screen overlay, the reflection a decal); a real version is a render pass and per-place settings.
+
+| Today, light shafts, grade and grain, glossy floor |
+|---|
+| ![effects](img/graphics-effects-sheet.jpg) |
+
+| Surfaces: flat against normal and roughness maps | All together |
+|---|---|
+| ![surfaces](img/graphics-surfaces.jpg) | ![hero](img/graphics-hero.jpg) |
+
 ### Phase 1 summary (so far, in progress)
 - **Achieved:** the Heist Director end to end (the server loop, plus a page where you describe a level, watch the repair rounds and play the result; the model's content filter tamed from about 25% to 0 of 20);  the API plumbing with a safe key path; the level spec and verifier; the Meta key tested against every
   model we plan to use; the three biggest risks (SAM on a sketch, structured output, voice latency) answered with real
   numbers; co-op on all four levels.
-- **Numbers:** 940 unit tests at the latest commit (836 at the baseline), lint and type-check clean, 31 commits.
+- **Numbers:** 940 unit tests at the latest commit (836 at the baseline), lint and type-check clean, 36 commits.
 - **Also achieved (gameplay track):** radio check-ins, habit counters (4 of 5) and tower snipers, all tested headlessly with and without the partner.
 - **Also achieved:** the loop test passed after three fixes, and `?spec=` loads a level from a spec (its `game.ts` half is written and waits to be committed with the gameplay edits).
 - **Still open in this phase:** the Vercel deployment, and your three real sketch photos. The verifier does not yet flag doors or lasers silently dropped on a looped grid, and start and exit should sit in dead ends or corners.
-- **Next:** the voice fast path, then the photo-to-map endpoint. Gameplay track still to do: riot shields in the exit waves (Nov 2), bunker turrets, fans and lamps, and the alpha dog and dogs (not in the plan yet).
+- **Also achieved:** voice orders end to end (the fast path about 1 s, the model path 2.3 to 3.4 s, in the page about 2 s and 4.3 s), and graphics prototypes with a Spark critique.
+- **Next:** the photo-to-map endpoint, then graphics for real (light shafts and the finish). Gameplay track still to do: riot shields in the exit waves (Nov 2), bunker turrets, fans and lamps, and the alpha dog and dogs (not in the plan yet).
