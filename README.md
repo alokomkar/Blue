@@ -49,7 +49,7 @@ Browser (game, three.js)
    ▼
 Server functions (Vercel)  ← API key lives here only
    ├─ /api/director    Muse Spark / Wonder tool loop + level verifier
-   ├─ /api/transcribe  Muse Voice Transcribe → Muse Spark → partner order
+   ├─ /api/transcribe  Muse Voice Transcribe → local fast path, else Muse Spark → partner order (built; /api/order is its typed twin)
    ├─ /api/scan        Muse Spark vision + SAM 3.1 → grid
    └─ /api/story       Muse Spark text + Muse Image
 ```
@@ -76,6 +76,8 @@ Level links (the debug links work on localhost only):
 | Tower | `/game.html?job=tower&n=1` | add `&coop=ai` |
 | Bunker | `/game.html?job=bunker` | add `&coop=ai` |
 | Shootout exit | `/game.html?job=tower&exit=1` | add `&coop=ai` |
+
+**Voice orders:** with the AI partner on, hold **V** (or the mic button) and say "cover me", "hold", "follow me", "regroup", "wait at the lift", "take the guard"; let go. It needs `npm run dev:api` (and a key in `.env`) beside `npm run dev`; the first press asks for the microphone, which is open only while the key is held, and the clip goes to Meta's model. On localhost, `window.__order("cover me")` in the console does the same from typed words.
 
 The model calls (Meta Model API) will go through serverless functions; the API key is never in the browser. Until
 those exist the game calls `/api/*`, gets nothing back, and carries on.

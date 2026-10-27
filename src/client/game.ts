@@ -268,6 +268,9 @@ import { HIGH_RUN_UP, LEVEL_HOLD_S, LOWER_S, MOUNT_S, DISMOUNT_S, MOUNT_CLIP_S, 
 import { initKeyboardControls } from './game/controls-keyboard';
 import { initTouchControls } from './game/controls-touch';
 import * as hud from './game/hud';
+import { initVoice } from './game/voice';
+import { COVER_RANGE, HOLD_LEAVE_M, NOISE_CELLS, TAKE_RANGE, TAKE_S, coverActive, coverRenewed, directiveLabel, holdOver, pickTarget, planOrder, type Candidate, type Directive } from './game/orders';
+import type { PartnerOrder } from '../shared/orders';
 import { portraitsReady, renderPortraits, warmPortraits } from './game/portrait';
 import type { Body } from './game/outfit';
 import { DEFAULT_STYLE, HAIRSTYLE_PIECES, SUIT_SHADES, type Style } from './game/skins';
@@ -2800,6 +2803,10 @@ function startJob(n: number, course: Course | null = null, dailyRun: DailyRun | 
   let partnerIdleFar = 0;
   /** How much longer to count it as trying to walk (a moment after the last frame it was). */
   let partnerTryLeft = 0;
+  /** Spoken orders (game/voice.ts, game/orders.ts): what it has been told to keep doing, and the guard or dog it has been told to take. Everything else it does as before. */
+  let partnerDirective: Directive = { kind: 'free' };
+  let partnerEngage: { target: Enemy; until: number } | null = null;
+  let partnerLastTarget: number | null = null;
   if (partnerOn) {
     partner = new Player(root.scene, 0, 0, agent === 'male' ? 'female' : 'male', look, style);
     partner.setTorch(false);
@@ -3036,7 +3043,7 @@ function startJob(n: number, course: Course | null = null, dailyRun: DailyRun | 
    * on the way to you, by the floor's own passages (doors that are locked count as walls). On another floor: by the stairs and lifts (partnerWays) that lead to yours, to the foot of the flight
    * and straight up it, or to the lift's doors to ride it. Null when there is no way (then it walks straight, or waits).
    */
-  function partnerNavGoal(floor: ActiveFloor, sameFloor: boolean): PartnerGoal | null {
+  function partnerNavGoal(floor: ActiveFloor, sameFloor: boolean, dest?: { x: number; z: number; floor: number }): PartnerGoal | null {
     if (!partner) return null;
     const { navCells, cols, rows } = floor.content;
     const o = floor.rig.group.position;
@@ -3062,11 +3069,12 @@ function startJob(n: number, course: Course | null = null, dailyRun: DailyRun | 
     const here0 = { x: partner.worldX - o.x, z: partner.worldZ - o.z };
     if (!towerLifts.some((l) => l.level === fi && l.rig.contains(here0.x, here0.z))) partnerCabLined = false;
     let goal: { x: number; z: number };
+    // (Where it is going: you, or, for the order to wait at the lift, a place of its own on a floor of its own.)
     if (sameFloor) {
-      goal = { x: player.worldX, z: player.worldZ };
+      goal = dest ?? { x: player.worldX, z: player.worldZ };
     } else {
       const all = partnerWays();
-      let way = nextLink(all, fi, activeFloorIdx);
+      let way = nextLink(all, fi, dest ? dest.floor : activeFloorIdx);
       if (!way) return null;
       // Two ways between the same pair of floors (a flight at each end of the hall, a flight and a lift): the one whose entrance is nearest to it.
       const first = way;
@@ -3323,6 +3331,19 @@ function startJob(n: number, course: Course | null = null, dailyRun: DailyRun | 
       const blockersNow = sameFloor ? [{ x: here.x, z: here.z, r: PLAYER_R }, ...blockers] : blockers;
       const inExit = player.currentFloorIdx === exitFloorIdx && exitLift.contains(here.x, here.z);
       partnerLiftWait = inExit ? partnerLiftWait + dt : 0;
+      // Spoken orders (game/voice.ts): a hold ends when you have gone well off, changed floor or are in the exit lift (it has to join you there); the lookout of "cover me" lapses with its time (a console keeps it up).
+      {
+        const working = activeHack !== null || activeTask !== null;
+        if (partnerDirective.kind === 'hold' && holdOver(reach, sameFloor, inExit)) {
+          partnerDirective = { kind: 'free' };
+          hud.showToast(`${partnerName.toUpperCase()} · ${inExit ? 'COMING TO THE LIFT' : 'FOLLOWING AGAIN'}`, 'neutral', 1800);
+        } else if (partnerDirective.kind === 'lift' && inExit) {
+          partnerDirective = { kind: 'free' };
+        } else if (partnerDirective.kind === 'cover') {
+          partnerDirective = coverRenewed(partnerDirective, stats.seconds, working);
+          if (!coverActive(partnerDirective, stats.seconds, working)) partnerDirective = { kind: 'free' };
+        }
+      }
       // You are in cover: it finds furniture of its own near you and takes cover there, and holds it until you leave yours.
       if (!inCover || inExit || !sameFloor) {
         partnerCover = null;
@@ -3362,6 +3383,27 @@ function startJob(n: number, course: Course | null = null, dailyRun: DailyRun | 
         if (!inCab && partnerLiftWait > 5) {
           const f = exitLift.spawn.facing;
           regroupPartner(exitLift.spawn.x - Math.sin(f) * 0.9, exitLift.spawn.z - Math.cos(f) * 0.9, f, exitFloorIdx * floorHeight);
+        }
+      } else if (partnerDirective.kind === 'hold') {
+        // Told to hold: it stands where it is. (It still shoots a guard that comes at it or at you, as ever, and a guard that gets a good look at it still puts it down.)
+        input = { turn: 0, throttle: 0, sneak: false, prone: false, dash: false };
+      } else if (partnerDirective.kind === 'lift') {
+        // Told to wait at the lift: to the exit lift's doors (by the corridors, the stairs and the lifts if the straight way is shut) and in, where it waits facing out.
+        const onExitFloor = partner.currentFloorIdx === exitFloorIdx;
+        const toFront = Math.hypot(me.x - exitLift.front.x, me.z - exitLift.front.z);
+        if (onExitFloor && exitLift.contains(me.x, me.z)) {
+          input = { turn: turnToward(me.angle, exitLift.spawn.facing), throttle: 0, sneak: false, prone: false, dash: false };
+        } else {
+          const aim = onExitFloor && toFront < 1.2 ? exitLift.spawn : exitLift.front;
+          const blocked = !onExitFloor || !hasLineOfSight(me.x, me.z, aim.x, aim.z, walls, 40);
+          const nav = blocked ? partnerNavGoal(floor, onExitFloor, { x: aim.x, z: aim.z, floor: exitFloorIdx }) : null;
+          if (nav?.ride) {
+            input = { turn: 0, throttle: 0, sneak: false, prone: false, dash: false };
+            partnerRideLift(nav.ride);
+          } else {
+            const step = goInput(me, nav ?? aim, { sneak: false, prone: false }, nav?.waypoint ? 0.25 : 0.5, true);
+            input = step.arrived ? { turn: turnToward(me.angle, exitLift.spawn.facing), throttle: 0, sneak: false, prone: false, dash: false } : step;
+          }
         }
       } else if (partnerCover) {
         const spot = partnerCover;
@@ -3420,12 +3462,25 @@ function startJob(n: number, course: Course | null = null, dailyRun: DailyRun | 
       partner.setProne(input.prone);
       partner.stepLie(dt);
       // Watching your back while you work a console: a guard that comes up on you gets shot.
-      if ((activeHack !== null || activeTask !== null) && partnerCooldown <= 0 && sameFloor) {
-        const threat = partnerTarget(LOOKOUT_RANGE, null);
+      const lookout = partnerDirective.kind === 'cover'; // ("cover me": the same lookout, without the console)
+      if ((activeHack !== null || activeTask !== null || lookout) && partnerCooldown <= 0 && sameFloor) {
+        const threat = partnerTarget(lookout ? COVER_RANGE : LOOKOUT_RANGE, null);
         if (threat) {
           partnerCooldown = BACKUP_COOLDOWN_S;
           hud.showToast(`${partnerName.toUpperCase()} · COVERING YOU`, 'good', 1400);
           partnerShoot(threat);
+        }
+      }
+      // "Take him": it keeps at the target it was given, with the same stun shot, until it is down or the time is up.
+      if (partnerEngage) {
+        const eng = partnerEngage;
+        if (eng.target.disabled) partnerEngage = null;
+        else if (stats.seconds > eng.until) {
+          partnerEngage = null;
+          hud.showToast(`${partnerName.toUpperCase()} · NO CLEAR SHOT`, 'neutral', 1800);
+        } else if (partnerCooldown <= 0 && sameFloor && hasLineOfSight(partner.worldX, partner.worldZ, eng.target.worldX, eng.target.worldZ, partnerWalls(), TAKE_RANGE)) {
+          partnerCooldown = BACKUP_COOLDOWN_S;
+          window.setTimeout(() => !signal.aborted && !caught && !cleared && partnerShoot(eng.target), 250);
         }
       }
       // Backup on its own: a guard coming up on either of you gets shot, whether or not you have fired.
@@ -3461,7 +3516,8 @@ function startJob(n: number, course: Course | null = null, dailyRun: DailyRun | 
       if (partnerSeen >= (exitMode ? SEEN_DOWN_S * 2.2 : SEEN_DOWN_S)) partnerGoesDown();
     }
     // Lost for good (outside the walls, round a loop it can't close): a long way off for a long time puts it back on your path.
-    partnerFarFor = partnerState === 'free' && sameFloor && reach > LOST_FAR_M && !inCover && !up ? partnerFarFor + dt : 0;
+    const roams = partnerDirective.kind !== 'hold' && partnerDirective.kind !== 'lift'; // (told to stay put or to wait at the lift, it is not lost when it is far from you)
+    partnerFarFor = partnerState === 'free' && sameFloor && roams && reach > LOST_FAR_M && !inCover && !up ? partnerFarFor + dt : 0;
     if (partnerFarFor > LOST_FAR_S) {
       const back = partnerBackSpot(floor, here);
       regroupPartner(back.x, back.z, partner.facingAngle);
@@ -3475,7 +3531,7 @@ function startJob(n: number, course: Course | null = null, dailyRun: DailyRun | 
       regroupPartner(spot.x, spot.z, player.facingAngle, activeFloorIdx * floorHeight);
     }
     // Standing about a long way from you, not trying to walk anywhere (a goal it thinks it has reached, a wait that never ends): put back on your path.
-    partnerIdleFar = partnerState === 'free' && sameFloor && !up && partnerTryLeft <= 0 && !partnerCoverReady && !partnerWorking && reach > NAV_FAR && arrivalPhase === 'done' ? partnerIdleFar + dt : 0;
+    partnerIdleFar = partnerState === 'free' && sameFloor && roams && !up && partnerTryLeft <= 0 && !partnerCoverReady && !partnerWorking && reach > NAV_FAR && arrivalPhase === 'done' ? partnerIdleFar + dt : 0;
     if (partnerIdleFar > 3) {
       partnerIdleFar = 0;
       const back = partnerBackSpot(floor, here);
@@ -3490,8 +3546,11 @@ function startJob(n: number, course: Course | null = null, dailyRun: DailyRun | 
       } else {
         partnerStuck.t += dt;
         if (wedged(partnerStuck.t, sameFloor)) {
-          // On your floor: back on your path behind you. On another: beside you, on your floor.
-          if (sameFloor) {
+          // On your floor: back on your path behind you. On another: beside you, on your floor. (Sent to the lift: to the lift.)
+          if (partnerDirective.kind === 'lift') {
+            const f = exitLift.spawn.facing;
+            regroupPartner(exitLift.spawn.x - Math.sin(f) * 0.9, exitLift.spawn.z - Math.cos(f) * 0.9, f, exitFloorIdx * floorHeight);
+          } else if (sameFloor) {
             const back = partnerBackSpot(floor, here);
             regroupPartner(back.x, back.z, partner.facingAngle);
           } else {
@@ -3513,8 +3572,83 @@ function startJob(n: number, course: Course | null = null, dailyRun: DailyRun | 
           ? { text: `Bringing ${label} round`, tone: 'down', fraction: partnerHold }
           : { text: `${label} down · ${Math.max(0, Math.ceil(DOWN_FAIL_S - partnerDownFor))}s · hold Interact beside them`, tone: 'down' }
       );
-    } else hud.setPartner({ text: `${label} · backing you up`, tone: 'free' });
+    } else {
+      const doing = partnerEngage && !partnerEngage.target.disabled ? 'taking the shot' : directiveLabel(partnerDirective, stats.seconds, activeHack !== null || activeTask !== null);
+      hud.setPartner({ text: `${label} · ${doing ?? 'backing you up'}`, tone: 'free' });
+    }
   }
+
+  // ---- Spoken orders (game/voice.ts records and sends the clip; game/orders.ts says what each order asks for; this carries it out with what the partner already does) ----
+
+  /** The guards and dogs the partner could be told to take, with how far, and whether it can see them. */
+  function takeCandidates(): Array<{ cand: Candidate; enemy: Enemy }> {
+    if (!partner) return [];
+    const walls = partnerWalls();
+    return partnerFloor().content.enemies.map((enemy, id) => {
+      const distance = Math.hypot(enemy.worldX - partner!.worldX, enemy.worldZ - partner!.worldZ);
+      const kind: Candidate['kind'] = enemy.kind === 'watchdog' ? 'dog' : enemy.kind === 'alpha' ? 'alpha' : enemy.kind === 'drone' || enemy.kind === 'crawler' ? 'other' : 'guard';
+      const visible = distance <= TAKE_RANGE && hasLineOfSight(partner!.worldX, partner!.worldZ, enemy.worldX, enemy.worldZ, walls, TAKE_RANGE);
+      return { cand: { id, kind, distance, visible, downed: enemy.disabled }, enemy };
+    });
+  }
+
+  /** "Distract": a clatter where the partner stands, which the guards within a few cells of walking go to look at. How many heard it. */
+  function partnerNoise(): number {
+    if (!partner) return 0;
+    const f = partnerFloor();
+    let heard = 0;
+    for (const e of f.content.enemies) {
+      if (e instanceof Bot && !e.disabled && e.investigate(partner.worldX, partner.worldZ, 6, f.content.navCells, f.content.cols, f.content.rows, NOISE_CELLS)) heard++;
+    }
+    sound.play('clatter', { x: partner.worldX, y: partner.worldY + 1, z: partner.worldZ });
+    return heard;
+  }
+
+  /**
+   * An order from the player's voice. Returns the partner's answer when it is not the order's own line (a shot it could not take, a partner that is down), else null.
+   * Hold: it stands still where it is. Follow: back to following. Cover me: the console lookout for a while. Take: a few seconds at one guard or dog with its stun shot.
+   * Distract: a noise where it stands, then it holds there. Wait at the lift: to the exit lift. Regroup: beside you. It keeps its own judgement under all of them (no "hold fire").
+   */
+  function applyPartnerOrder(order: PartnerOrder): { say: string; ok: boolean } | null {
+    if (!partner) return { say: 'No partner.', ok: false };
+    const plan = planOrder(order, stats.seconds, { down: partnerState === 'down', canLift: true });
+    if (plan.refuse) return { say: plan.refuse, ok: false };
+    if (plan.dropEngage) partnerEngage = null;
+    if (plan.directive) {
+      partnerDirective = plan.directive;
+      if (plan.directive.kind === 'hold') toastOnce('partnerhold', `${partnerName.toUpperCase()} HOLDS UNTIL YOU SAY FOLLOW OR REGROUP · OR YOU GO MORE THAN ${HOLD_LEAVE_M} M OFF`, 5200);
+    }
+    if (plan.regroup) {
+      const here = { x: player.worldX, z: player.worldZ };
+      if (partner.currentFloorIdx === activeFloorIdx) {
+        const back = partnerBackSpot(partnerFloor(), here);
+        regroupPartner(back.x, back.z, partner.facingAngle);
+      } else {
+        const f = player.facingAngle;
+        const spot = partnerFreeSpot(storeys[activeFloorIdx]!, here.x - Math.sin(f) * 2.2, here.z - Math.cos(f) * 2.2);
+        regroupPartner(spot.x, spot.z, f, activeFloorIdx * floorHeight);
+      }
+    }
+    if (plan.noise && partnerNoise() === 0) return { say: 'Nobody heard that.', ok: false };
+    if (plan.engage) {
+      const all = takeCandidates();
+      const pick = pickTarget(plan.engage, all.map((c) => c.cand), partnerLastTarget);
+      if (!pick) return { say: plan.engage === 'nearest_dog' ? 'No dog in sight.' : 'No clear shot.', ok: false };
+      partnerEngage = { target: all[pick.id]!.enemy, until: stats.seconds + TAKE_S };
+      partnerLastTarget = pick.id;
+    }
+    return null;
+  }
+
+  initVoice({
+    signal,
+    getKey: () => keyMap.talk,
+    keyLabel: () => keyName(keyMap.talk),
+    partnerName,
+    hasPartner: () => partner !== null,
+    canTalk: () => !caught && !cleared && !paused(),
+    apply: applyPartnerOrder,
+  });
 
   // Heavy guns for the agent (game/bigguns.ts): the gun menu (key 2, the chip by the fire bar, the kit's Gun button) changes gun and the choice is kept in this browser. On localhost `?gun=AR_4` picks one.
   {

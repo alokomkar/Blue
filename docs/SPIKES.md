@@ -86,3 +86,21 @@ SAM-cut potted plant sprite (it did not show up in the framing, so the shot does
 `graphics-sample-after.jpg`. **Finding:** the game draws a fog-of-war overlay over the floor, so a floor texture swapped on the floor tiles
 shows nothing; decals sit above that layer (y 0.14 m) and show. A real feature would hook the floor overlay's colour or draw floor art as
 decals. Nothing from this prototype is in the game's code yet.
+
+## Addendum: the voice partner, built (spike 6 follow-up, Oct 27)
+
+Measured through the real endpoint (`api/ai/transcribe.ts`, macOS `say` clips of 0.4 to 2.9 s, three runs each, a home connection from India; times are the server's own `ms` plus the whole request as curl saw it):
+
+| Clip | Path | ASR | Order | Whole request |
+|---|---|---|---|---|
+| "cover me", "hold", "follow me", "regroup", "wait at the lift", "take the guard" | fast (no model) | 0.84 to 1.65 s | 0 ms | 0.86 to 1.67 s (median about 1.0 s) |
+| "cover me while I work the console" | Spark | 1.3 to 1.5 s | 0.8 to 2.2 s | 2.3 to 3.4 s |
+| "take out the guard on the left, then hold at the lift" (first step: `take`) | Spark | 1.7 s | 1.8 to 2.6 s | 3.5 to 4.3 s |
+| "what a nice day" (none) | Spark | 0.9 to 1.7 s | 0.8 to 1.9 s | 1.7 to 3.6 s |
+
+In the page, from letting go of the key to the reply on screen (a headless browser with a fake microphone, which adds the clip upload and a proxy hop): about 1.9 to 2.4 s for the fast path, 2.3 to 4.3 s for a model-read command and 4.6 to 4.9 s for the compound one.
+The words appear first (`?stream=1`): about 1.7 s (compound) before the order, so the delay reads as listening.
+
+Things learned: the tap of the recording graph (an `AudioWorkletNode` with no output) is held by the recorder so nothing can collect it while the key is down (hardening, not a proven fault); in the headless test setup an audio context's clock sometimes
+barely advanced (a clip of about a tenth of a second, reported by the page as "too short"), which a plain page in the same browser did not do and which a retry cleared, so it is treated as the test setup; Meta's input filter was not
+triggered by "take out the guard" (the phrase is softened to "stun" before it goes out anyway).
