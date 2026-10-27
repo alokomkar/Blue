@@ -7,6 +7,7 @@
     "api/ai/scan.ts": { "maxDuration": 60, "memory": 1024 },
     "api/ai/story.ts": { "maxDuration": 60, "memory": 1024 },
     "api/ai/transcribe.ts": { "maxDuration": 30, "memory": 512 },
+    "api/ai/order.ts": { "maxDuration": 30, "memory": 256 },
     "api/ai/ping.ts": { "maxDuration": 10, "memory": 256 }
   },
   "headers": [
