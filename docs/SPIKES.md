@@ -61,3 +61,18 @@ filter ("The response was filtered due to the prompt triggering our content mana
 request passed on other tries and with a shorter system prompt, so the filter is borderline and not deterministic: a rejected call is tried once
 more, then the Director falls back to a verified level and reports `request_rejected`. Plan: show the fallback as "the closest level we could
 make" so a demo never dead-ends.
+
+## Addendum: game art from Muse Image and SAM (spikes 9 and 10, Oct 27, 00:30 IST)
+
+Question: can Meta's models improve the game's graphics? `scripts/spikes/spike9_graphics.mjs` and `spike10_cutout.mjs`.
+
+| Art | Result |
+|---|---|
+| Seamless floor texture, stone (1024 x 1024) | Clean grey tiles in 17.7 s. |
+| Seamless floor texture, red carpet with a gold pattern | Tiled 2 x 2 it reads as one carpet, with only a faint horizontal seam at the join (an edge blend would hide it). 23.5 s. |
+| Wall painting in a gold frame | A convincing framed abstract oil painting, 9.8 s. |
+| Panorama, 2048 x 1024 | A moody invented port city at night, teal and orange haze: the size `2048x1024` is accepted. 19.4 s. |
+| A prop on white, then SAM 3.1 `potted plant` | One match in 2.2 s, a clean silhouette mask (small gaps between stems). That makes a sprite with transparent edges, which Muse Image cannot give directly (its background is always opaque). |
+
+Limits: 8 to 24 s per image, 150 images a minute, $0.01 each, so art is made when a level is built (or ahead of time) and cached, never
+per frame; the content filter applies; tiling and style consistency are not guaranteed, so the prompts say "seamless, flat, from above".
