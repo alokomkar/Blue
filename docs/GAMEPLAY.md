@@ -126,3 +126,24 @@ turned aside, which rewards moving round them.
 - Whether snipers should also shoot the AI partner (assumed yes, with a lower hit chance than the player).
 - Bridge width and rail height, and whether the player can drop from a bridge to the floor (assumed yes, with the
   existing drop and landing).
+
+## 6. What the author likes in Splinter Cell: Blacklist (Oct 27)
+
+Reference for the look and the feel (the author's own screenshots, not stored here): a lit-and-dark stealth game where levels are set pieces, not
+corridors. Six things were named. This section says what each is, what the game has today, what Meta's models could do, and a rough cost in
+focused days. Nothing here is built yet. **Black State** (a stealth game where doors can open onto a different space) is a second reference.
+
+**The demo uses the original agent and guard models.** The CC0 bodies in the public repo look plainer. The live demo is built with
+`npm run build:original` (see the README), and the demo screenshots use it too.
+
+| # | Wanted | Today | What to build | Meta tie-in | Cost |
+|---|---|---|---|---|---|
+| 1 | The mission written in bold text on the level before play starts | A brief card and a PDA | A full-width title card at the start of a level (bold stencil text, the objective, an optional timer bar), then the camera hands over | Spark writes the line from the level spec; the Director page can show it | 0.5 |
+| 2 | Conversations with the player's peers shown as cinematics | None (the story cutscenes were removed from this repo) | A short letterboxed scene: two speakers, subtitles, a slow camera move, a sound sting; 15 to 25 s, skippable | Spark writes the dialogue from the spec; Muse Image can make the two portraits; there is no speech synthesis in Meta's API, so subtitles only | 2 |
+| 3 | Guards in choreographed positions that give the player a stealth takedown | Procedural patrols and sentries, no setpieces | A `scenes` list in the level spec: pairs talking, a guard on a break, a patrol that splits at a corner, a guard facing a window. A checker proves each scene leaves a takedown window (a reachable cell behind the guard at some time, out of every other guard's view) | The Director authors the scenes; the verifier checks them: this is the "verifiable agent" idea extended | 3 |
+| 4 | Outdoor windows in rooms, and doors that lock and unlock so the guards stay oblivious | Glass skylights in the tower, security doors and keys | (a) Windows: wall quads showing an outside view (b) a door the player can lock behind them, which a guard treats as "someone is in there" only after a radio miss | (a) The generated night panorama from the graphics spike, one per place | (a) 1.5 (b) 1 |
+| 5 | Rooms with more character, no two alike | One look per place; the AI dressing prototype | Each room gets a theme (a dressing set: furniture groups, art, rugs, lamps) chosen by the Director and drawn by the AI art | Muse Image for the art, Spark for the theme choice | 3 |
+| 6 | Outdoor balconies that join rooms | Ledges, tall-wall hang and shimmy, a roof hatch | An outdoor ledge route between rooms, with a view | A panorama and a skyline backdrop | 6 to 8 (new geometry, like the sniper platforms) |
+
+**Suggested order:** 1 (the cheapest, the biggest first impression), then 3 (it answers "run and gun" and "all levels look the same"), then 4a (windows), then 2.
+5 and 4b if time remains; 6 is the post-hackathon item. 1, 3 and 4a together are about five days, so they must share the nine days with photo to map, the story layer and polish.
