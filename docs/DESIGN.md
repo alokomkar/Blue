@@ -145,6 +145,33 @@ transcript (no second model call), so they cost only the transcription (1.6–2.
 (minimal effort, `max_tokens` 1200+, act on the first step only). The transcript appears at once so the delay reads as listening.
 No speech synthesis exists in Meta's API: replies are subtitles and a short radio sound.
 
+**Built (Oct 27):**
+
+- **Orders** (`src/shared/orders.ts`, tested): the type and JSON schema above, `parseOrder` (any model JSON becomes a legal order), and the local fast path `matchOrder(transcript)`. The rule is *whole sentence or nothing*: after
+  the punctuation, "um", "okay", "please", "can you" and the partner's name are stripped, the sentence has to be exactly one of the known commands ("cover me", "hold", "stay", "follow me", "regroup", "come here", "wait at the
+  lift", "take the guard", "shoot the dog", "distract"...). Anything longer ("I will hold the door"), negated ("do not cover me"), joined with "and / then / while / if" ("cover me while I work the console") or with an object
+  the table does not know ("take the guard on the left") returns `null` and goes to the model, which may still answer `none`.
+- **`POST /api/ai/transcribe`** (multipart `audio`, mono 16-bit WAV at 16 or 24 kHz, at most 10 s and 1 MB) answers `{ transcript, order, source: 'fast' | 'model' | 'none', ms: { asr, order } }` (with `?stream=1`, which the page uses, the same as two JSON lines: the words as soon as they are heard, the whole answer when the order is known, so a slow Spark step shows what was heard while it works). Transcription is `PUSH_TO_TALK` with the
+  game's words as keywords; then `matchOrder`; then, only if that is `null`, one Spark call (`json_schema`, `reasoning_effort: 'minimal'`, `max_tokens: 1500`, "act on the FIRST step", "none for anything that is not a command", violent
+  verbs softened to "stun"). If only the Spark step fails the transcript still comes back with order `none` (and a `note`); a failed transcription is `{ error, fallback: true }`. **`POST /api/ai/order`** `{ text }` is the same
+  second half for typed words. Both share `api/_lib/voice.ts`.
+- **Page** (`src/client/game/voice.ts`, `voicehud.ts`, `wavencode.ts`): hold **V** (rebindable in the controls sheet: the next-trap camera moved to J to make room) or the mic button; the clip is cut at 6 s, resampled to 24 kHz and
+  encoded as WAV (`wavencode.ts`, tested against the endpoint's own `checkWav`). The subtitle shows `…` while the clip is read, then `YOU: "cover me"` and `AGENT B: Covering you`. Privacy: the microphone is asked for on
+  the first press only, is open only while the key is held (tracks stopped on release, on a window blur, when the job ends), and the screen says once that the clip goes to Meta's model. On localhost `window.__order("cover me")`
+  runs the same path from typed words.
+- **What each order does** (`src/client/game/orders.ts` is the pure mapping, `game.ts` the glue; the partner keeps its own judgement under all of them: there is no "hold fire", it still shoots a guard on you and still takes cover when you do):
+
+| Order | In the game |
+|---|---|
+| `hold` | Stands where it is until `follow` / `regroup` / another order, or until you are more than 30 m away, on another floor or in the exit lift (the lift still takes both). It is not "lost" while holding. |
+| `follow` | Back to following your path (the existing behaviour). |
+| `cover_me` | The console lookout, without the console: for 30 s (longer while you work a console) it stuns a guard that comes within 9 m with a clear view. |
+| `take` | Engages the nearest guard (or dog, or "the next one") it can see within 12 m with its stun shot, for up to 5 s. No target in sight: "No clear shot". |
+| `distract` | **Simplified:** a clatter where it stands, the guards within 9 cells of walking go to look, and it holds there. (It does not first walk to a point in the guard's view.) |
+| `wait_at_lift` | Walks to the exit lift (by the corridors, stairs and lifts) and waits in the cab, facing out. When you step into the exit it is already there; the exit rule is unchanged. |
+| `regroup` | The existing blink: it is put back beside you, on your path. |
+| `none` | Nothing moves; the subtitle shows "NOT AN ORDER". |
+
 **Later (stretch):** a realtime relay (an always-on WebSocket server), since the realtime endpoint needs the key in the
 handshake.
 

@@ -359,11 +359,32 @@ Rooms recovered from the sketch, as a 16 x 16 grid (digits are rooms, dots are w
   with no page errors.
 - **In plain terms:** the three features are now switched on in the game. Played on your stable builds below.
 
+### e69d588 · 00:35 · Spikes 9 and 10: Muse Image makes game art, SAM cuts props out
+- **Input:** you asked whether Meta's APIs can improve the in-game graphics, then to see a sample level.
+- **Output:** a seamless stone floor, a seamless red carpet (a faint seam at the join), a gilded painting, a night panorama (2048 x 1024)
+  and a potted plant on white, in 8 to 24 s each at $0.01; SAM cut the plant out cleanly in 2.2 s. Then a prototype: a museum level
+  dressed with a carpet runner and seven paintings on the walls (before and after, same position, below). The floor texture did
+  not show because the game covers the floor with a fog-of-war layer; decals above that layer do. Not in the game's code yet.
+- **In plain terms:** the AI can make the art that makes each level look different, and it looks right in the game. The proposal
+  is to make it when a level is built and cache it.
+
+| Before: plain walls and floor | After: AI carpet and paintings |
+|---|---|
+| ![before](img/graphics-sample-before.jpg) | ![after](img/graphics-sample-after.jpg) |
+
+| The art Muse Image made (stone, carpet, painting, plant) | A tiled carpet (the seam is faint) |
+|---|---|
+| ![art sheet](img/graphics-art-sheet.jpg) | ![tiled carpet](img/graphics-carpet-tiled.jpg) |
+
+| The night panorama | The plant's SAM mask |
+|---|---|
+| ![panorama](img/graphics-panorama.jpg) | ![mask](img/graphics-cutout-mask.jpg) |
+
 ### Phase 1 summary (so far, in progress)
 - **Achieved:** the Heist Director end to end (the server loop, plus a page where you describe a level, watch the repair rounds and play the result; the model's content filter tamed from about 25% to 0 of 20);  the API plumbing with a safe key path; the level spec and verifier; the Meta key tested against every
   model we plan to use; the three biggest risks (SAM on a sketch, structured output, voice latency) answered with real
   numbers; co-op on all four levels.
-- **Numbers:** 940 unit tests at the latest commit (836 at the baseline), lint and type-check clean, 30 commits.
+- **Numbers:** 940 unit tests at the latest commit (836 at the baseline), lint and type-check clean, 31 commits.
 - **Also achieved (gameplay track):** radio check-ins, habit counters (4 of 5) and tower snipers, all tested headlessly with and without the partner.
 - **Also achieved:** the loop test passed after three fixes, and `?spec=` loads a level from a spec (its `game.ts` half is written and waits to be committed with the gameplay edits).
 - **Still open in this phase:** the Vercel deployment, and your three real sketch photos. The verifier does not yet flag doors or lasers silently dropped on a looped grid, and start and exit should sit in dead ends or corners.

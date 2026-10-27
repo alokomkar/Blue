@@ -76,3 +76,13 @@ Question: can Meta's models improve the game's graphics? `scripts/spikes/spike9_
 
 Limits: 8 to 24 s per image, 150 images a minute, $0.01 each, so art is made when a level is built (or ahead of time) and cached, never
 per frame; the content filter applies; tiling and style consistency are not guaranteed, so the prompts say "seamless, flat, from above".
+
+### A sample level with the generated art (prototype, Oct 27, 01:10 IST)
+
+A museum level (the Director's `museum` spec) was started in a scratch build of the committed game and dressed from the browser with the
+spike 9 and 10 images: a red-and-gold carpet runner down the main corridor (the generated carpet texture, repeated), seven gold-framed
+paintings hung on the corridor walls (the generated painting, on planes just off the wall faces, self-lit so the dark level shows them), and a
+SAM-cut potted plant sprite (it did not show up in the framing, so the shot does not prove it). Same position, with and without: `docs/img/graphics-sample-before.jpg` and
+`graphics-sample-after.jpg`. **Finding:** the game draws a fog-of-war overlay over the floor, so a floor texture swapped on the floor tiles
+shows nothing; decals sit above that layer (y 0.14 m) and show. A real feature would hook the floor overlay's colour or draw floor art as
+decals. Nothing from this prototype is in the game's code yet.
